@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     // KSP Añadido
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -59,6 +60,11 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    //Firebase
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-storage-ktx")
 
     // Componentes de arquitectura (ViewModel & LiveData)
     val lifecycle_version = "2.6.2"

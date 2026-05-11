@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "271827283923",
+    "project_id": "arpeg-io",
+    "storage_bucket": "arpeg-io.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:271827283923:android:3b39fea7009d1897380926",
+        "android_client_info": {
+          "package_name": "com.example.tfgv01"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAKa99jFVxwKnESWpBvS9l18iPWte8OVSE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
