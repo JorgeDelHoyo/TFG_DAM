@@ -2,21 +2,18 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    // KSP Añadido
     alias(libs.plugins.ksp)
-    alias(libs.plugins.google.services)
+    id("com.google.gms.google-services") // Esto ya aplica "com.google.gms.google-services"
 }
 
 android {
     namespace = "com.example.tfgv01"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.example.tfgv01"
         minSdk = 27
-        targetSdk = 36
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -61,10 +58,11 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    //Firebase
-    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    // Firebase
+    implementation(platform("com.google.firebase:firebase-bom:33.9.0"))
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-storage-ktx")
+    implementation("com.google.firebase:firebase-analytics-ktx") // Añade -ktx para consistencia
 
     // Componentes de arquitectura (ViewModel & LiveData)
     val lifecycle_version = "2.6.2"

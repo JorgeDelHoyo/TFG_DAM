@@ -1,11 +1,16 @@
 package com.example.tfgv01.data.model
 
+import com.google.firebase.firestore.PropertyName
+
 data class Cancion(
-    val id: String = "",
-    val titulo: String = "",
-    val artista: String = "",
-    val youtubeVideoId: String = "",
-    // Un mapa donde la clave es el instrumento (Guitarra, Bajo, etc.)
-    // y el valor es la URL del archivo de la partitura (.gp3)
-    val partituras: Map<String, String> = emptyMap()
+    var id: String = "",
+    var titulo: String = "",
+    var artista: String = "",
+    var link: String = "",
+    var partituras: List<PartituraRelacion> = emptyList()
+)
+
+data class PartituraRelacion(
+    var instrumentoId: String = "",
+    var archivo: String = ""
 )
