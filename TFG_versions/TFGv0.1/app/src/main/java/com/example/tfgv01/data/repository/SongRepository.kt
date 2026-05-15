@@ -1,44 +1,39 @@
+// app/src/main/java/com/example/tfgv01/data/repository/SongRepository.kt
 package com.example.tfgv01.data.repository
 
-import com.example.tfgv01.data.model.Cancion
-import com.example.tfgv01.data.model.PartituraRelacion
+import com.example.tfgv01.data.model.Song
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import javax.inject.Inject
 
-class SongRepository {
-    private val db = FirebaseFirestore.getInstance()
+class SongRepository @Inject constructor(
+    private val firestore: FirebaseFirestore
+) {
+    private val collection = firestore.collection("canciones")
 
-    suspend fun getSongs(): List<Cancion> {
-        val db = FirebaseFirestore.getInstance()
-        return try {
-            val snapshot = db.collection("canciones").get().await()
-
-            snapshot.documents.map { doc ->
-                // Leemos los campos uno a uno para evitar errores de mayúsculas
-                val cancion = Cancion(
-                    id = doc.id,
-                    titulo = doc.getString("Título") ?: "",
-                    artista = doc.getString("Artista") ?: "",
-                    link = doc.getString("Link") ?: ""
-                )
-
-                // Traemos la subcolección de partituras
-                val partsSnapshot = db.collection("canciones")
-                    .document(doc.id)
-                    .collection("partituras")
-                    .get().await()
-
-                cancion.partituras = partsSnapshot.documents.map { partDoc ->
-                    PartituraRelacion(
-                        instrumentoId = partDoc.getString("instrumentoId") ?: "",
-                        archivo = partDoc.getString("archivo") ?: ""
-                    )
+    fun getSongs(): Flow<List<Song>> = callbackFlow {
+        val listener = collection
+            .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
                 }
-                cancion
+                val songs = snapshot?.toObjects(Song::class.java) ?: emptyList()
+                trySend(songs)
             }
-        } catch (e: Exception) {
-            android.util.Log.e("FIREBASE", "Error cargando canciones", e)
-            emptyList()
-        }
+        awaitClose { listener.remove() }
+    }
+
+    suspend fun getSongById(songId: String): Result<Song> = try {
+        val document = collection.document(songId).get().await()
+        val song = document.toObject(Song::class.java)
+        if (song != null) Result.success(song)
+        else Result.failure(Exception("Canción no encontrada"))
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 }

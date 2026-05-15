@@ -1,34 +1,95 @@
+// app/src/main/java/com/example/tfgv01/ui/viewmodel/PlayerViewModel.kt
 package com.example.tfgv01.ui.viewmodel
 
-import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.example.tfgv01.data.model.Cancion
-import com.example.tfgv01.data.repository.SongRepository
-import kotlinx.coroutines.launch
+import com.example.tfgv01.data.model.Song
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import javax.inject.Inject
 
-class PlayerViewModel : ViewModel() {
-    private val repository = SongRepository()
+@HiltViewModel
+class PlayerViewModel @Inject constructor(
+    private val savedStateHandle: SavedStateHandle
+) : ViewModel() {
 
-    private val _songs = mutableStateOf<List<Cancion>>(emptyList())
-    val songs: State<List<Cancion>> = _songs
+    // 🎵 Canción actual (se pasa desde LibraryScreen vía navegación)
+    private val _song = MutableStateFlow<Song?>(null)
+    val song: StateFlow<Song?> = _song.asStateFlow()
 
-    private val _selectedSong = mutableStateOf<Cancion?>(null)
-    val selectedSong: State<Cancion?> = _selectedSong
+    // 🎸 Instrumento seleccionado para la tablatura
+    private val _selectedInstrument = MutableStateFlow<String>("guitar")
+    val selectedInstrument: StateFlow<String> = _selectedInstrument.asStateFlow()
 
-    init {
-        loadSongs()
+    // ▶️ Estado de reproducción (para sincronizar YouTube + WebView)
+    private val _isPlaying = MutableStateFlow(false)
+    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+
+    // ⏱️ Tiempo actual del video (en segundos)
+    private val _currentTime = MutableStateFlow(0f)
+    val currentTime: StateFlow<Float> = _currentTime.asStateFlow()
+
+    // 🎚️ Velocidad de reproducción (0.5x a 2.0x)
+    private val _playbackSpeed = MutableStateFlow(1.0f)
+    val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
+
+    /**
+     * 🎯 Carga la canción seleccionada desde LibraryScreen
+     */
+    fun loadSong(song: Song) {
+        _song.value = song
+        // Resetear estado al cargar nueva canción
+        _isPlaying.value = false
+        _currentTime.value = 0f
+        _selectedInstrument.value = song.tabs.keys.firstOrNull() ?: "guitar"
     }
 
-    fun loadSongs() {
-        viewModelScope.launch {
-            val remoteSongs = repository.getSongs()
-            _songs.value = remoteSongs
+    /**
+     * 🎸 Cambia el instrumento de la tablatura
+     */
+    fun selectInstrument(instrument: String) {
+        if (_song.value?.hasTabFor(instrument) == true) {
+            _selectedInstrument.value = instrument
         }
     }
 
-    fun selectSong(cancion: Cancion?) {
-        _selectedSong.value = cancion
+    /**
+     * ▶️/⏸️ Toggle play/pause
+     */
+    fun togglePlay() {
+        _isPlaying.value = !_isPlaying.value
+    }
+
+    /**
+     * ⏱️ Actualiza el tiempo actual del video (llamado desde YoutubePlayer)
+     */
+    fun updateCurrentTime(seconds: Float) {
+        _currentTime.value = seconds
+    }
+
+    /**
+     * ⏭️ Busca en el video (llamado desde UI o WebView)
+     */
+    fun seekTo(seconds: Float) {
+        _currentTime.value = seconds
+        // 🔜 Aquí podrías emitir un evento para que YoutubePlayer haga seek
+    }
+
+    /**
+     * 🎚️ Cambia la velocidad de reproducción
+     */
+    fun setPlaybackSpeed(speed: Float) {
+        _playbackSpeed.value = speed.coerceIn(0.5f, 2.0f)
+    }
+
+    /**
+     * 🔄 Obtiene la URL del archivo .gp3 para el instrumento seleccionado
+     */
+    fun getTabAssetPath(): String? {
+        val song = _song.value ?: return null
+        val instrument = _selectedInstrument.value
+        return song.tabs[instrument]
     }
 }

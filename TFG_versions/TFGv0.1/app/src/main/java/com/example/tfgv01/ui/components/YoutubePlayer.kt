@@ -1,37 +1,49 @@
 package com.example.tfgv01.ui.components
 
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.YouTubePlayerCallback
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 
+data class ExternalControls(
+    val play: Boolean = false,
+    val playbackSpeed: Float = 1.0f
+)
+
 @Composable
-fun YoutubePlayer(videoId: String) {
-    val lifecycleOwner = LocalLifecycleOwner.current
+fun YouTubePlayer(
+    videoId: String,
+    autoplay: Boolean = false,
+    onPlayerReady: (YouTubePlayer) -> Unit = {},
+    externalControls: ExternalControls? = null,
+    modifier: Modifier = Modifier
+) {
+    var youTubePlayerRef by remember { mutableStateOf<YouTubePlayer?>(null) }
 
     AndroidView(
         factory = { context ->
             YouTubePlayerView(context).apply {
-                lifecycleOwner.lifecycle.addObserver(this)
-
                 addYouTubePlayerListener(object : AbstractYouTubePlayerListener() {
                     override fun onReady(youTubePlayer: YouTubePlayer) {
-                        youTubePlayer.cueVideo(videoId, 0f) // 'cue' prepara, 'load' arranca
+                        youTubePlayerRef = youTubePlayer
+                        youTubePlayer.loadVideo(videoId, 0f)
+                        if (!autoplay) youTubePlayer.pause()
+                        onPlayerReady(youTubePlayer)
                     }
                 })
             }
         },
-        update = { playerView ->
-            playerView.getYouTubePlayerWhenReady(object : YouTubePlayerCallback {
-                override fun onYouTubePlayer(youTubePlayer: YouTubePlayer) {
-                    // Usamos cueVideo en lugar de loadVideo si el error persiste,
-                    // para que no intente reproducir hasta que el usuario le dé
-                    youTubePlayer.cueVideo(videoId, 0f)
+        modifier = modifier,
+        update = { view ->
+            externalControls?.let { controls ->
+                youTubePlayerRef?.let { player ->
+                    if (controls.play) player.play() else player.pause()
+                    // ✅ La biblioteca acepta Float directamente (NO usa enum PlaybackRate)
+                    player.setPlaybackRate(controls.playbackSpeed)
                 }
-            })
+            }
         }
     )
 }
