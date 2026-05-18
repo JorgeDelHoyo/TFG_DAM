@@ -4,7 +4,9 @@ package com.example.tfgv01
 import android.app.Application
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
+import dagger.hilt.android.HiltAndroidApp
 
+@HiltAndroidApp
 class ArpegioApp : Application() {
     override fun onCreate() {
         super.onCreate()

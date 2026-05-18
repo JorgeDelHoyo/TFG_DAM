@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
@@ -17,10 +17,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.tfgv01.data.model.Song
 import com.example.tfgv01.ui.components.PartituraWebView
 import com.example.tfgv01.ui.components.YouTubePlayer
-import com.example.tfgv01.ui.components.ExternalControls  // ✅ Import crítico
+import com.example.tfgv01.ui.components.ExternalControls
 import com.example.tfgv01.ui.viewmodel.PlayerViewModel
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener
 
 @Composable
 fun PlayerScreen(
@@ -32,8 +30,8 @@ fun PlayerScreen(
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val currentTime by viewModel.currentTime.collectAsStateWithLifecycle()
     val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
-    val tabAssetPath by remember(song, selectedInstrument) {
-        derivedStateOf { viewModel.getTabAssetPath() }
+    val tabAssetPath = remember(song, selectedInstrument) {
+        song.tabs[selectedInstrument]?.toAssetPath()
     }
 
     LaunchedEffect(song) {
@@ -47,7 +45,7 @@ fun PlayerScreen(
             .verticalScroll(rememberScrollState())
     ) {
         IconButton(onClick = onNavigateBack, modifier = Modifier.align(Alignment.Start)) {
-            Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
         }
 
         SongHeader(song = song, modifier = Modifier.padding(vertical = 8.dp))
@@ -57,17 +55,10 @@ fun PlayerScreen(
             isPlaying = isPlaying,
             playbackSpeed = playbackSpeed,
             onTimeUpdate = { seconds -> viewModel.updateCurrentTime(seconds) },
-            onPlayerReady = { youTubePlayer ->
-                youTubePlayer.addListener(object : AbstractYouTubePlayerListener() {
-                    override fun onCurrentSecond(youTubePlayer: YouTubePlayer, second: Float) {
-                        viewModel.updateCurrentTime(second)
-                    }
-                })
-            },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
                 .padding(vertical = 8.dp)
+                .height(240.dp)
         )
 
         PlaybackControls(
@@ -91,14 +82,20 @@ fun PlayerScreen(
         )
 
         tabAssetPath?.let { assetPath ->
-            val instrumentIndex = song.tabs.keys.toList().indexOf(selectedInstrument)
-            PartituraWebView(
-                urlArchivo = assetPath,
-                instrumentIndex = instrumentIndex
-            )
+            val instrumentIndex = song.tabs.keys.toList().indexOf(selectedInstrument).coerceAtLeast(0)
+            key(assetPath, instrumentIndex) {
+                PartituraWebView(
+                    urlArchivo = assetPath,
+                    instrumentIndex = instrumentIndex,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(520.dp)
+                        .padding(vertical = 8.dp)
+                )
+            }
         } ?: run {
             Text(
-                text = "❌ No hay tablatura disponible para ${selectedInstrument}",
+                text = "No hay tablatura disponible para ${selectedInstrument}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(16.dp)
@@ -106,6 +103,11 @@ fun PlayerScreen(
         }
     }
 }
+
+private fun String.toAssetPath(): String = trim()
+    .removePrefix("file:///android_asset/")
+    .removePrefix("android_asset/")
+    .removePrefix("assets/")
 
 @Composable
 private fun SongHeader(song: Song, modifier: Modifier = Modifier) {
@@ -124,15 +126,18 @@ private fun YouTubePlayerSection(
     isPlaying: Boolean,
     playbackSpeed: Float,
     onTimeUpdate: (Float) -> Unit,
-    onPlayerReady: (YouTubePlayer) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(modifier = modifier, elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
         YouTubePlayer(
             videoId = videoId,
             autoplay = false,
-            onPlayerReady = onPlayerReady,
-            externalControls = ExternalControls(play = isPlaying, playbackSpeed = playbackSpeed)
+            onCurrentSecond = onTimeUpdate,
+            externalControls = ExternalControls(
+                play = isPlaying,
+                playbackSpeed = playbackSpeed
+            ),
+            modifier = Modifier.fillMaxSize()
         )
     }
 }
@@ -148,15 +153,26 @@ private fun PlaybackControls(
 ) {
     Column(modifier = modifier.padding(horizontal = 16.dp)) {
         Text(text = "⏱️ ${String.format("%.1f", currentTime)}s", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             FloatingActionButton(onClick = onPlayPause) {
                 val icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
                 val description = if (isPlaying) "Pausar" else "Reproducir"
                 Icon(imageVector = icon, contentDescription = description)
             }
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("🎚️ Velocidad:", style = MaterialTheme.typography.labelMedium)
-                Slider(value = playbackSpeed, onValueChange = onSpeedChange, valueRange = 0.5f..2.0f, steps = 5, modifier = Modifier.width(120.dp))
+                Slider(
+                    value = playbackSpeed,
+                    onValueChange = onSpeedChange,
+                    valueRange = 0.25f..2.0f,
+                    steps = 3,
+                    modifier = Modifier.width(120.dp)
+                )
                 Text("${playbackSpeed}x", style = MaterialTheme.typography.labelMedium)
             }
         }
@@ -174,8 +190,12 @@ private fun InstrumentSelector(
     Column(modifier = modifier.padding(horizontal = 16.dp)) {
         Text("🎸 Instrumento:", style = MaterialTheme.typography.labelMedium)
         ScrollableTabRow(selectedTabIndex = availableInstruments.indexOf(selectedInstrument), edgePadding = 0.dp, modifier = Modifier.padding(top = 4.dp)) {
-            availableInstruments.forEachIndexed { index, instrument ->
-                Tab(selected = instrument == selectedInstrument, onClick = { onInstrumentSelected(instrument) }, text = { Text(instrument.capitalize()) })
+            availableInstruments.forEach { instrument ->
+                Tab(
+                    selected = instrument == selectedInstrument,
+                    onClick = { onInstrumentSelected(instrument) },
+                    text = { Text(instrument.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }) }
+                )
             }
         }
     }

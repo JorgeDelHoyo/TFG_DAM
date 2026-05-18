@@ -81,7 +81,15 @@ class PlayerViewModel @Inject constructor(
      * 🎚️ Cambia la velocidad de reproducción
      */
     fun setPlaybackSpeed(speed: Float) {
-        _playbackSpeed.value = speed.coerceIn(0.5f, 2.0f)
+        // ✅ Redondear a los valores que YouTube acepta
+        val validSpeed = when {
+            speed <= 0.37f -> 0.25f
+            speed <= 0.75f -> 0.5f
+            speed <= 1.25f -> 1.0f
+            speed <= 1.75f -> 1.5f
+            else -> 2.0f
+        }
+        _playbackSpeed.value = validSpeed
     }
 
     /**
@@ -91,5 +99,11 @@ class PlayerViewModel @Inject constructor(
         val song = _song.value ?: return null
         val instrument = _selectedInstrument.value
         return song.tabs[instrument]
+            ?.trim()
+            ?.removePrefix("file:///android_asset/")
+            ?.removePrefix("android_asset/")
+            ?.removePrefix("assets/")
     }
+
+
 }

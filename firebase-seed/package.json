@@ -1,0 +1,14 @@
+{
+  "name": "arpegio-firebase-seed",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Herramienta local para importar canciones en Firestore.",
+  "type": "commonjs",
+  "scripts": {
+    "import": "node import_songs.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}
+

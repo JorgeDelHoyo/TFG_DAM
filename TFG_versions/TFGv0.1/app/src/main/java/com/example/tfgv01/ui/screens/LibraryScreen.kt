@@ -5,8 +5,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -23,10 +27,11 @@ fun LibraryScreen(
     onSongSelected: (Song) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 🔄 Observa el StateFlow del ViewModel
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var searchQuery by rememberSaveable { mutableStateOf("") }
 
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(title = { Text("🎸 Mi Biblioteca") })
         }
@@ -48,8 +53,14 @@ fun LibraryScreen(
                 if (state.songs.isEmpty()) {
                     EmptyLibraryView(modifier = Modifier.padding(padding))
                 } else {
+                    val filteredSongs = remember(state.songs, searchQuery) {
+                        state.songs.filterByTitleOrArtist(searchQuery)
+                    }
+
                     SongList(
-                        songs = state.songs,
+                        songs = filteredSongs,
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { searchQuery = it },
                         onSongClick = onSongSelected,
                         modifier = Modifier.padding(padding)
                     )
@@ -67,21 +78,68 @@ fun LibraryScreen(
     }
 }
 
-// 📋 Lista de canciones con LazyColumn
 @Composable
 private fun SongList(
     songs: List<Song>,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
     onSongClick: (Song) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item {
+            SearchField(
+                query = searchQuery,
+                onQueryChange = onSearchQueryChange
+            )
+        }
+
+        if (songs.isEmpty()) {
+            item {
+                Text(
+                    text = "No hay canciones que coincidan",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 16.dp)
+                )
+            }
+        }
+
         items(songs, key = { it.id }) { song ->
             SongItem(song = song, onClick = { onSongClick(song) })
         }
     }
 }
 
-// 🎵 Item individual de canción
+@Composable
+private fun SearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = modifier.fillMaxWidth(),
+        singleLine = true,
+        label = { Text("Buscar por titulo o artista") },
+        leadingIcon = {
+            Icon(Icons.Filled.Search, contentDescription = null)
+        },
+        trailingIcon = {
+            if (query.isNotBlank()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(Icons.Filled.Clear, contentDescription = "Limpiar busqueda")
+                }
+            }
+        }
+    )
+}
+
 @Composable
 private fun SongItem(song: Song, onClick: () -> Unit) {
     Card(
@@ -102,7 +160,6 @@ private fun SongItem(song: Song, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            // Badge de dificultad (opcional)
             if (song.difficulty.isNotBlank()) {
                 AssistChip(
                     onClick = {},
@@ -115,7 +172,6 @@ private fun SongItem(song: Song, onClick: () -> Unit) {
     }
 }
 
-// 📭 Vista cuando no hay canciones
 @Composable
 private fun EmptyLibraryView(modifier: Modifier = Modifier) {
     Column(
@@ -134,7 +190,6 @@ private fun EmptyLibraryView(modifier: Modifier = Modifier) {
     }
 }
 
-// ❌ Vista de error con botón de reintento
 @Composable
 private fun ErrorView(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
@@ -152,5 +207,15 @@ private fun ErrorView(message: String, onRetry: () -> Unit, modifier: Modifier =
         Button(onClick = onRetry, modifier = Modifier.padding(top = 16.dp)) {
             Text("Reintentar")
         }
+    }
+}
+
+private fun List<Song>.filterByTitleOrArtist(query: String): List<Song> {
+    val normalizedQuery = query.trim()
+    if (normalizedQuery.isEmpty()) return this
+
+    return filter { song ->
+        song.title.contains(normalizedQuery, ignoreCase = true) ||
+            song.artist.contains(normalizedQuery, ignoreCase = true)
     }
 }

@@ -1,0 +1,25 @@
+[
+  {
+    "id": "bohemian_rhapsody",
+    "title": "Bohemian Rhapsody",
+    "artist": "Queen",
+    "youtubeVideoId": "fJ9rUzIMcZQ",
+    "tabs": {
+      "guitar": "queen-bohemian_rhapsody.gp3"
+    },
+    "difficulty": "intermediate",
+    "tags": ["queen", "rock"]
+  },
+  {
+    "id": "killer_queen",
+    "title": "Killer Queen",
+    "artist": "Queen",
+    "youtubeVideoId": "2ZBtPf7FOoM",
+    "tabs": {
+      "guitar": "queen-killer_queen.gp3"
+    },
+    "difficulty": "intermediate",
+    "tags": ["queen", "rock"]
+  }
+]
+

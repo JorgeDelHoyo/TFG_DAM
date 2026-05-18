@@ -1,43 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AndroidLayouts">
+    <shared>
+      <config />
+    </shared>
+  </component>
   <component name="AutoImportSettings">
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
     <list default="true" id="969e75e4-9e7a-4344-86f6-0c52a4ae5fcb" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/MainActivity.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/viewmodel/LibraryVievModel.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/kotlinc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/kotlinc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/.idea/AndroidProjectSystem.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/.idea/compiler.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/.idea/deploymentTargetSelector.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/.idea/deviceManager.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/.idea/gradle.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/.idea/migrations.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/.idea/misc.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/.idea/runConfigurations.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/.idea/vcs.xml" beforeDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/di/FirebaseModule.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/AndroidManifest.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/assets/player.html" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/assets/player.html" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ArpegioApp.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ArpegioApp.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/data/model/Cancion.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/data/model/Cancion.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/data/repository/SongRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/data/repository/SongRepository.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/components/PartituraWebView.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/components/PartituraWebView.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/components/YoutubePlayer.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/components/YoutubePlayer.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/screens/LibraryScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/screens/LibraryScreen.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/screens/PlayerScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/screens/PlayerScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/theme/Color.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/theme/Color.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/theme/Theme.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/theme/Theme.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/theme/Type.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/theme/Type.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/viewmodel/PlayerViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/viewmodel/PlayerViewModel.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/gradle/libs.versions.toml" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/gradle/libs.versions.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/gradlew" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/gradlew" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/propmt.txt" beforeDir="false" afterPath="$PROJECT_DIR$/propmt.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -65,6 +51,13 @@
       </state>
     </system>
   </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Kotlin File" />
+      </list>
+    </option>
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
@@ -85,6 +78,7 @@
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.cidr.known.project.marker": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
     "git-widget-placeholder": "database-feature",
