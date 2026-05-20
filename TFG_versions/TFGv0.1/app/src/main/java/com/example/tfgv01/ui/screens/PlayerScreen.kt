@@ -46,25 +46,18 @@ fun PlayerScreen(
     var lastYoutubeTime by remember { mutableStateOf(0f) }
     var systemTimeAtLastUpdate by remember { mutableStateOf(0L) }
 
-    // Sincronizar cada vez que YouTube mande su pulso perezoso (baja frecuencia)
     LaunchedEffect(currentTime) {
         lastYoutubeTime = currentTime
         systemTimeAtLastUpdate = System.nanoTime()
     }
 
-    // Reloj de alta frecuencia sincronizado con la tasa de refresco (60Hz / 120Hz)
     LaunchedEffect(isPlaying, playbackSpeed) {
         if (isPlaying) {
             while (true) {
                 withFrameMillis { _ ->
                     val now = System.nanoTime()
-                    // Calcular segundos reales del sistema transcurridos desde el último pulso de YT
                     val elapsedSystemSeconds = (now - systemTimeAtLastUpdate) / 1_000_000_000f
-
-                    // Extrapolar el tiempo teniendo en cuenta la velocidad de reproducción
                     val extrapolatedTime = lastYoutubeTime + (elapsedSystemSeconds * playbackSpeed)
-
-                    // Inyectar directamente al WebView sin pasar por recomposiciones de Compose
                     partituraWebViewRef.value?.evaluateJavascript(
                         "correctAutoScrollTime($extrapolatedTime);",
                         null
@@ -79,18 +72,87 @@ fun PlayerScreen(
         viewModel.loadSong(song)
     }
 
-    Column(
+    // Cambiamos el contenedor raíz a Box para permitir superposición de capas
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(8.dp)
-            .verticalScroll(rememberScrollState())
     ) {
-        IconButton(onClick = onNavigateBack, modifier = Modifier.align(Alignment.Start)) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+        // CAPA DEL FONDO: Toda la interfaz principal (Fija, sin scroll de pantalla)
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            IconButton(onClick = onNavigateBack, modifier = Modifier.align(Alignment.Start)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+            }
+
+            SongHeader(song = song, modifier = Modifier.padding(vertical = 4.dp))
+
+            // La partitura pasa arriba y se estira para usar todo el espacio libre
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(vertical = 4.dp)
+            ) {
+                tabAssetPath?.let { assetPath ->
+                    val instrumentIndex = song.tabs.keys.toList().indexOf(selectedInstrument).coerceAtLeast(0)
+                    key(assetPath, instrumentIndex) {
+                        PartituraWebView(
+                            urlArchivo = assetPath,
+                            instrumentIndex = instrumentIndex,
+                            videoDuration = videoDuration,
+                            modifier = Modifier.fillMaxSize(),
+                            onWebViewCreated = { webView ->
+                                partituraWebViewRef.value = webView
+                                if (isPlaying) {
+                                    webView.startAutoScroll(currentTime)
+                                }
+                            }
+                        )
+                    }
+                } ?: run {
+                    Text(
+                        text = "No hay tablatura disponible para ${selectedInstrument}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(16.dp).align(Alignment.Center)
+                    )
+                }
+            }
+
+            // Selector de instrumento fijo abajo
+            InstrumentSelector(
+                availableInstruments = song.tabs.keys.toList(),
+                selectedInstrument = selectedInstrument,
+                onInstrumentSelected = { viewModel.selectInstrument(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            )
+
+            // Controles de reproducción fijos abajo del todo
+            PlaybackControls(
+                isPlaying = isPlaying,
+                currentTime = currentTime,
+                playbackSpeed = playbackSpeed,
+                onPlayPause = {
+                    val wasPlaying = isPlaying
+                    viewModel.togglePlay()
+                    if (wasPlaying) {
+                        partituraWebViewRef.value?.stopAutoScroll()
+                    } else {
+                        partituraWebViewRef.value?.startAutoScroll(currentTime)
+                    }
+                },
+                onSpeedChange = { viewModel.setPlaybackSpeed(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            )
         }
 
-        SongHeader(song = song, modifier = Modifier.padding(vertical = 8.dp))
-
+        // CAPA SUPERIOR: El reproductor de YouTube como ventana flotante mini
         YouTubePlayerSection(
             videoId = song.youtubeVideoId,
             isPlaying = isPlaying,
@@ -104,68 +166,11 @@ fun PlayerScreen(
                 partituraWebViewRef.value?.evaluateJavascript("if (typeof window.setVideoDuration === 'function') { setVideoDuration($duration); }", null)
             },
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-                .height(240.dp)
+                .align(Alignment.BottomEnd) // <- Lo ubica abajo a la derecha
+                .padding(bottom = 120.dp, end = 16.dp) // <- Separación para no tapar los botones de Play/Slider
+                .width(160.dp)  // <- Ancho de ventana flotante (relación de aspecto 16:9 aprox)
+                .height(90.dp)   // <- Alto de ventana flotante
         )
-
-        PlaybackControls(
-            isPlaying = isPlaying,
-            currentTime = currentTime,
-            playbackSpeed = playbackSpeed,
-            onPlayPause = {
-                // Calcular nuevo estado ANTES de toggle para evitar stale closure
-                val wasPlaying = isPlaying
-                viewModel.togglePlay()
-                if (wasPlaying) {
-                    partituraWebViewRef.value?.stopAutoScroll()
-                } else {
-                    partituraWebViewRef.value?.startAutoScroll(currentTime)
-                }
-            },
-            onSpeedChange = { viewModel.setPlaybackSpeed(it) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        )
-
-        InstrumentSelector(
-            availableInstruments = song.tabs.keys.toList(),
-            selectedInstrument = selectedInstrument,
-            onInstrumentSelected = { viewModel.selectInstrument(it) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        )
-
-        tabAssetPath?.let { assetPath ->
-            val instrumentIndex = song.tabs.keys.toList().indexOf(selectedInstrument).coerceAtLeast(0)
-            key(assetPath, instrumentIndex) {
-                PartituraWebView(
-                    urlArchivo = assetPath,
-                    instrumentIndex = instrumentIndex,
-                    videoDuration = videoDuration,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(520.dp)
-                        .padding(vertical = 8.dp),
-                    onWebViewCreated = { webView ->
-                        partituraWebViewRef.value = webView
-                        // Configurar el scroll inicial si el video está reproduciéndose
-                        if (isPlaying) {
-                            webView.startAutoScroll(currentTime)
-                        }
-                    }
-                )
-            }
-        } ?: run {
-            Text(
-                text = "No hay tablatura disponible para ${selectedInstrument}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(16.dp)
-            )
-        }
     }
 }
 
