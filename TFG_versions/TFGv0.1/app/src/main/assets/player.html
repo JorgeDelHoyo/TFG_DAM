@@ -1,185 +1,327 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Arpegio Player</title>
-
-    <!-- ✅ AlphaTab 1.6.0 (versión fija, sin MIME issues) -->
-    <!-- CSS opcional: alphaTab aplica estilos base por defecto -->
-    <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.6.0/dist/alphaTab.min.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.3.0/dist/alphaTab.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: #1a1a2e;
-        }
-        #partitura {
-            width: 100%;
+        body { margin: 0; padding: 0; background-color: #ffffff; overflow: hidden; }
+
+        .at-container {
             height: 100vh;
-            overflow: auto;
+            overflow-y: scroll !important;
+            overflow-x: hidden !important;
+            position: relative;
+            background-color: #ffffff !important;
+            -webkit-overflow-scrolling: touch;
         }
-        #loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-family: sans-serif;
-            font-size: 18px;
+        #alphaTab { width: 100% !important; background: #ffffff; position: relative; padding-bottom: 500px; }
+
+        #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; display: none; z-index: 10; background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 8px; }
+        #debug-panel { position: fixed; top: 0; left: 0; right: 0; background: rgba(255,255,0,0.95); color: #000; font-size: 11px; padding: 6px; max-height: 120px; overflow-y: auto; white-space: pre-wrap; z-index: 3000; border-bottom: 2px solid #ff0; font-family: monospace; pointer-events: none; }
+
+        /* Ocultamos los cursores nativos bugeados para evitar dobles líneas */
+        .at-cursor-beat, .at-selection, .at-cursor { display: none !important; }
+
+        /* 🎯 EL NUEVO CURSOR MAESTRO INMUNE */
+        #master-cursor {
+            position: absolute;
+            background-color: rgba(255, 0, 0, 0.22) !important;
+            border-left: 3px solid #ff0000 !important;
+            z-index: 2500 !important;
+            pointer-events: none;
             display: none;
+            box-sizing: border-box;
+            transition: left 0.15s linear, top 0.2s ease-out; /* Desplazamiento ultra suave */
         }
+
+        #control-test { position: fixed; bottom: 10px; right: 10px; z-index: 4000; background: #00ffff; padding: 10px; border-radius: 8px; font-family: sans-serif; }
+        #control-test button { font-weight: bold; padding: 6px 12px; margin: 2px; background: #000; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
     </style>
 </head>
 <body>
-<div id="partitura"></div>
+<div id="debug-panel">🔍 Inicializando motor maestro de compases...</div>
+
+<div id="control-test">
+    <div style="font-size:10px; color:#000; margin-bottom:4px; text-align:center;">TEST COMPASES</div>
+    <button onclick="testSimularAvance()">▶️ Simular Vídeo</button>
+    <button onclick="testDetener()">⏹️ Parar</button>
+</div>
+
+<div class="at-container" id="scroll-container">
+    <div id="alphaTab"></div>
+    <div id="master-cursor"></div>
+</div>
 <div id="loading">Cargando partitura...</div>
 
 <script>
-    let alphaTabApi = null;
-    let currentFileName = null;
-    let isInitialized = false;
-    let pendingTrackIndex = 0;
+    var api = null, isInitialized = false, pendingTrackIndex = 0;
+    var totalDuration = 60, totalTicks = 96000;
+    var VIDEO_TOTAL_DURATION = 180;
+    var hasExternalDuration = false;
 
-    async function loadSong(fileName, trackIndex = 0) {
-        console.log('[JS] loadSong llamado: ' + fileName);
-        pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
-        document.getElementById('loading').style.display = 'block';
-        isInitialized = false;
+    var testInterval = null;
+    var testSegundos = 0;
+    var ultimoRenglonY = -1;
+    var masterCursorEl = null;
+    var cajasCompases = []; // Almacenará la geometría de los compases 1, 2 y 3
 
-        try {
-            if (alphaTabApi) {
-                alphaTabApi.destroy();
-                alphaTabApi = null;
-            }
-
-            const assetUrl = fileName.startsWith('file://')
-                ? fileName
-                : 'file:///android_asset/' + fileName.replace(/^\/+/, '');
-
-            const settings = {
-                player: {
-                    enable: false,
-                    soundFont: 'https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.6.0/dist/soundfont/sonivox.sf2'
-                },
-                display: {
-                    layoutMode: 'horizontal',
-                    stretchForce: 0.5,
-                    cursorMode: 1
-                },
-                core: {
-                    enableCursor: true,
-                    scrollMode: 1
-                }
-            };
-
-            const container = document.getElementById('partitura');
-            container.innerHTML = '';
-            alphaTabApi = new alphaTab.AlphaTabApi(container, settings);
-
-            // ✅ Eventos compatibles con 1.6.0: usar .on() en lugar de .subscribe()
-            if (typeof alphaTabApi.scoreLoaded?.on === 'function') {
-                alphaTabApi.scoreLoaded.on((score) => {
-                    console.log('[JS] Score cargado: ' + score.title + ' / pistas: ' + score.tracks.length);
-                    renderTrack(pendingTrackIndex);
-                });
-            }
-            if (typeof alphaTabApi.renderFinished?.on === 'function') {
-                alphaTabApi.renderFinished.on(() => {
-                    console.log('[JS] Renderizado completado');
-                    document.getElementById('loading').style.display = 'none';
-                    isInitialized = true;
-                });
-            }
-            if (typeof alphaTabApi.error?.on === 'function') {
-                alphaTabApi.error.on((err) => {
-                    console.error('[JS] Error en alphaTab:', err);
-                    document.getElementById('loading').style.display = 'none';
-                });
-            }
-
-            const response = await fetch(assetUrl);
-            if (!response.ok) {
-                throw new Error('No se pudo cargar ' + assetUrl + ' HTTP ' + response.status);
-            }
-
-            const data = await response.arrayBuffer();
-            console.log('[JS] Archivo leído: ' + data.byteLength + ' bytes');
-
-            // ✅ load() en 1.6.0+ puede retornar Promise: encadenamos para mayor seguridad
-            const loadResult = alphaTabApi.load(data, [pendingTrackIndex]);
-            console.log('[JS] alphaTabApi.load iniciado');
-
-            if (loadResult && typeof loadResult.then === 'function') {
-                await loadResult;
-                console.log('[JS] Load Promise resuelta');
-            }
-
-            currentFileName = fileName;
-            console.log('[JS] alphaTab inicializado para: ' + assetUrl);
-
-        } catch (e) {
-            console.error('[JS] Error cargando canción:', e);
-            document.getElementById('loading').style.display = 'none';
-        }
+    function debug(m) {
+        console.log('[JS]', m);
+        var p = document.getElementById('debug-panel');
+        if (p) p.textContent = '[JS] ' + m + '\n' + p.textContent;
     }
 
-    function changeTrack(trackIndex) {
-        console.log('[JS] changeTrack llamado: índice ' + trackIndex);
-        pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
+    api = new alphaTab.AlphaTabApi(document.getElementById('alphaTab'), {
+        player: { enablePlayer: false, enableCursor: false },
+        core: { fileReadUrl: 'https://appassets.androidplatform.net/assets/', includeNoteBounds: true },
+        display: { layout: 'page', scrollMode: 'off' }
+    });
 
-        if (!alphaTabApi) {
-            console.warn('[JS] ⚠️ alphaTab no inicializado aún');
+    if (api.scoreLoaded && api.scoreLoaded.on) {
+        api.scoreLoaded.on(function(s) {
+            totalDuration = s.duration || 60;
+            totalTicks = s.endTick || 96000;
+            debug('🎵 Partitura cargada. Duración original: ' + totalDuration + 's');
+            if (!hasExternalDuration) {
+                VIDEO_TOTAL_DURATION = totalDuration;
+                debug('⏱️ Duración de la partitura usada por defecto: ' + VIDEO_TOTAL_DURATION + 's');
+            } else {
+                debug('⏱️ Manteniendo duración externa del vídeo: ' + VIDEO_TOTAL_DURATION + 's');
+            }
+        });
+    }
+
+    if (api.renderFinished && api.renderFinished.on) {
+        api.renderFinished.on(function() {
+            document.getElementById('loading').style.display = 'none';
+            masterCursorEl = document.getElementById('master-cursor');
+
+            debug('⏳ Render finalizado. Calculando mapa de compases...');
+            setTimeout(function() {
+                mapearCompasesDesdeGeometria();
+            }, 500);
+        });
+    }
+
+    // 📦 RECOLECTOR GEOMÉTRICO DE COMPASES INDESTRUCTIBLE
+    function mapearCompasesDesdeGeometria() {
+        cajasCompases = [];
+        ultimoRenglonY = -1;
+
+        if (!api.score || !api.score.masterBars) {
+            debug('❌ Error crítico: Estructura del score ausente.');
             return;
         }
 
-        renderTrack(pendingTrackIndex);
-    }
-
-    function renderTrack(trackIndex) {
         try {
-            if (!alphaTabApi.score) {
-                console.warn('[JS] ⚠️ Score no cargado aún');
-                return;
+            var lookup = api.boundsLookup || (api.renderer ? api.renderer.boundsLookup : null);
+            debug('🔍 lookup: ' + (lookup ? 'sí' : 'no'));
+            if (lookup) {
+                debug('🔍 lookup keys: ' + Object.keys(lookup).join(', '));
+                if (lookup.staffSystems && lookup.staffSystems.length > 0) {
+                    debug('🔍 first system keys: ' + Object.keys(lookup.staffSystems[0]).join(', '));
+                }
             }
 
-            const tracks = alphaTabApi.score.tracks;
-            if (!tracks || tracks.length === 0) {
-                console.warn('[JS] ⚠️ No hay pistas disponibles');
-                return;
+            if (lookup && lookup.staffSystems) {
+                lookup.staffSystems.forEach(function(system) {
+                    if (system.bars) {
+                        system.bars.forEach(function(barBounds) {
+                            var trackIdx = -1;
+                            if (barBounds.bar) {
+                                if (barBounds.bar.track) {
+                                    trackIdx = barBounds.bar.track.index;
+                                } else if (typeof barBounds.bar.trackIndex !== 'undefined') {
+                                    trackIdx = barBounds.bar.trackIndex;
+                                }
+                            }
+                            if (trackIdx === pendingTrackIndex) {
+                                var bounds = barBounds.realBounds || barBounds.visualBounds;
+                                if (bounds && bounds.w > 0 && bounds.h > 0) {
+                                    cajasCompases.push({
+                                        index: barBounds.bar.index,
+                                        x: bounds.x,
+                                        y: bounds.y,
+                                        w: bounds.w,
+                                        h: bounds.h
+                                    });
+                                }
+                            }
+                        });
+                    }
+                });
             }
 
-            const safeIndex = Math.max(0, Math.min(trackIndex, tracks.length - 1));
-            alphaTabApi.renderTracks([tracks[safeIndex]]);
-            console.log('[JS] Pista renderizada: ' + safeIndex);
+            // Ordenar por el índice del compás real
+            cajasCompases.sort(function(a, b) { return a.index - b.index; });
 
+            if (cajasCompases.length > 0) {
+                isInitialized = true;
+                debug('📦 ¡Mapa de compases completado! Detectados y guardados: ' + cajasCompases.length + ' compases.');
+            } else {
+                // Plan B de emergencia: Si el mapeo falla, leemos los elementos SVG del DOM generados para los compases
+                var svgBars = document.querySelectorAll('.at-bar, svg g');
+                if(svgBars.length > 0) {
+                    // Simulación controlada dividiendo la altura total entre el número de elementos detectados
+                    var totalH = document.getElementById('alphaTab').clientHeight || 600;
+                    var numBars = Math.max(3, api.score.masterBars.length);
+                    var altoIndividual = totalH / numBars;
+                    for(var k = 0; k < numBars; k++) {
+                        cajasCompases.push({
+                            index: k,
+                            x: 0,
+                            y: k * altoIndividual,
+                            w: document.getElementById('alphaTab').clientWidth || 360,
+                            h: altoIndividual
+                        });
+                    }
+                    isInitialized = true;
+                    debug('📦 Modo Adaptativo por Bloques Activo (' + cajasCompases.length + ' zonas).');
+                } else {
+                    debug('⚠️ Componentes visuales no listos en el DOM. Reintentando en 400ms...');
+                    setTimeout(mapearCompasesDesdeGeometria, 400);
+                }
+            }
         } catch (e) {
-            console.error('[JS] Error cambiando pista:', e);
+            debug('❌ Fallo en mapeo de compases: ' + e.message);
         }
     }
 
-    function togglePlay() {
-        if (alphaTabApi?.player) {
-            alphaTabApi.player.playPause();
-            console.log('[JS] Play/Pause toggled');
+    // 🔄 RECEPTOR DE SINCRONIZACIÓN POR COMPÁS Y SALTO SECO
+    function sincronizarConVideo(seconds) {
+        if (!isInitialized || cajasCompases.length === 0 || !masterCursorEl) return;
+
+        var progressPercent = seconds / VIDEO_TOTAL_DURATION;
+        if (progressPercent > 1) progressPercent = 1;
+        if (progressPercent < 0) progressPercent = 0;
+
+        // 1. Identificamos en qué compás estamos en base al tiempo transcurrido
+        var duracionPorCompas = VIDEO_TOTAL_DURATION / cajasCompases.length;
+        var indexCompasActual = Math.floor(seconds / duracionPorCompas);
+        if (indexCompasActual >= cajasCompases.length) indexCompasActual = cajasCompases.length - 1;
+        if (indexCompasActual < 0) indexCompasActual = 0;
+
+        var compas = cajasCompases[indexCompasActual];
+
+        // 2. Calculamos cuánto ha avanzado el vídeo dentro de ESTE compás específico (0.0 a 1.0)
+        var tiempoInicioCompas = indexCompasActual * duracionPorCompas;
+        var progresoInternoCompas = (seconds - tiempoInicioCompas) / duracionPorCompas;
+        if (progresoInternoCompas > 1) progresoInternoCompas = 1;
+        if (progresoInternoCompas < 0) progresoInternoCompas = 0;
+
+        // 3. Movemos el cursor flotante de izquierda a derecha de forma suave dentro del compás
+        var cursorX = compas.x + (progresoInternoCompas * compas.w);
+        var anchoCursorNota = 24; // Ancho visual estimado para cubrir la nota musical
+
+        masterCursorEl.style.display = 'block';
+
+        if (compas.y !== ultimoRenglonY) {
+            // Salto de línea: desactivar animación temporalmente para evitar deslizamiento diagonal
+            masterCursorEl.style.transition = 'none';
+            masterCursorEl.style.left = cursorX + 'px';
+            masterCursorEl.style.top = (compas.y + 4) + 'px';
+            masterCursorEl.style.width = anchoCursorNota + 'px';
+            masterCursorEl.style.height = (compas.h - 8) + 'px';
+            
+            // Forzar reflujo del navegador
+            void masterCursorEl.offsetWidth;
+            
+            // Restaurar transición para movimiento horizontal suave (adaptada a la tasa de reporte)
+            masterCursorEl.style.transition = 'left 0.2s linear, width 0.2s ease, height 0.2s ease';
+            
+            ultimoRenglonY = compas.y;
+            var container = document.getElementById('scroll-container');
+            if (container) {
+                // Posicionamos el compás un 15% por debajo del techo superior de la pantalla
+                var targetScroll = compas.y - (container.clientHeight * 0.15);
+                if (targetScroll < 0) targetScroll = 0;
+
+                // Scroll suave del contenedor
+                container.scrollTo({
+                    top: targetScroll,
+                    behavior: 'smooth'
+                });
+                debug('⚡ Salto de pantalla al compás: ' + (indexCompasActual + 1));
+            }
+        } else {
+            masterCursorEl.style.left = cursorX + 'px';
+            masterCursorEl.style.top = (compas.y + 4) + 'px';
+            masterCursorEl.style.width = anchoCursorNota + 'px';
+            masterCursorEl.style.height = (compas.h - 8) + 'px';
         }
     }
 
-    function seekTo(seconds) {
-        if (alphaTabApi?.player) {
-            alphaTabApi.player.seekTo(seconds * 1000);
-            console.log('[JS] Seek to: ' + seconds + 's');
+    // 🧪 SIMULADOR EN TIEMPO REAL
+    function testSimularAvance() {
+        testDetener();
+        if (!isInitialized) {
+            debug('⚠️ Esperando a que el mapa geométrico esté listo...');
+            return;
+        }
+        debug('🧪 Iniciando avance continuo...');
+        testInterval = setInterval(function() {
+            testSegundos += 0.2;
+            if (testSegundos > VIDEO_TOTAL_DURATION) {
+                testDetener();
+                return;
+            }
+
+            if (Math.abs(testSegundos % 2) < 0.15) {
+                debug('⏱️ Tiempo: ' + Math.round(testSegundos) + 's / ' + VIDEO_TOTAL_DURATION + 's');
+            }
+
+            sincronizarConVideo(testSegundos);
+        }, 200);
+    }
+
+    function testDetener() {
+        if (testInterval) { clearInterval(testInterval); testInterval = null; }
+        testSegundos = 0;
+        ultimoRenglonY = -1;
+        if (masterCursorEl) masterCursorEl.style.display = 'none';
+        debug('⏹️ Simulación detenida.');
+    }
+
+    // 🎛️ COUPLING ANDROID / KOTLIN
+    function correctAutoScrollTime(time) { sincronizarConVideo(time); }
+    function updateScrollPosition(time) { sincronizarConVideo(time); }
+    function startAutoScroll(resumeTime) { sincronizarConVideo(resumeTime); }
+    function stopAutoScroll() {}
+
+    function setVideoDuration(duration) {
+        if (duration && Number(duration) > 0) {
+            VIDEO_TOTAL_DURATION = Number(duration);
+            hasExternalDuration = true;
+            debug('⏱️ Duración del vídeo actualizada desde Android: ' + VIDEO_TOTAL_DURATION + 's');
         }
     }
 
-    function isReady() {
-        return isInitialized && alphaTabApi !== null;
+    function loadSong(fileName, trackIndex, duration) {
+        debug('📂 Cargando: ' + fileName);
+        pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
+        if (duration && Number(duration) > 0) {
+            VIDEO_TOTAL_DURATION = Number(duration);
+            hasExternalDuration = true;
+            debug('⏱️ Duración inicial del vídeo recibida: ' + VIDEO_TOTAL_DURATION + 's');
+        } else {
+            hasExternalDuration = false;
+        }
+        document.getElementById('loading').style.display = 'block';
+        isInitialized = false; testDetener();
+        api.load(fileName.startsWith('http') ? fileName : 'https://appassets.androidplatform.net/assets/' + fileName.replace(/^\/+/, ''), [pendingTrackIndex]);
     }
 
-    console.log('[JS] player.html cargado - funciones disponibles: loadSong, changeTrack, togglePlay, seekTo');
+    function changeTrack(trackIndex) {
+        pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
+        if (api && api.score) {
+            isInitialized = false; testDetener();
+            api.renderTracks([api.score.tracks[pendingTrackIndex]]);
+        }
+    }
+
+    function isReady() { return isInitialized; }
 </script>
 </body>
 </html>

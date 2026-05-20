@@ -1,5 +1,6 @@
 package com.example.tfgv01.ui.screens
 
+import android.webkit.WebView
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,6 +19,10 @@ import com.example.tfgv01.data.model.Song
 import com.example.tfgv01.ui.components.PartituraWebView
 import com.example.tfgv01.ui.components.YouTubePlayer
 import com.example.tfgv01.ui.components.ExternalControls
+import com.example.tfgv01.ui.components.correctAutoScrollTime
+import com.example.tfgv01.ui.components.startAutoScroll
+import com.example.tfgv01.ui.components.stopAutoScroll
+import com.example.tfgv01.ui.components.updateScrollPosition
 import com.example.tfgv01.ui.viewmodel.PlayerViewModel
 
 @Composable
@@ -33,6 +38,42 @@ fun PlayerScreen(
     val tabAssetPath = remember(song, selectedInstrument) {
         song.tabs[selectedInstrument]?.toAssetPath()
     }
+
+    val partituraWebViewRef = remember { mutableStateOf<WebView?>(null) }
+    var videoDuration by remember { mutableStateOf(180f) }
+
+    // --- ⚡ MÓDULO DE FLUIDEZ ABSOLUTA ⚡ ---
+    var lastYoutubeTime by remember { mutableStateOf(0f) }
+    var systemTimeAtLastUpdate by remember { mutableStateOf(0L) }
+
+    // Sincronizar cada vez que YouTube mande su pulso perezoso (baja frecuencia)
+    LaunchedEffect(currentTime) {
+        lastYoutubeTime = currentTime
+        systemTimeAtLastUpdate = System.nanoTime()
+    }
+
+    // Reloj de alta frecuencia sincronizado con la tasa de refresco (60Hz / 120Hz)
+    LaunchedEffect(isPlaying, playbackSpeed) {
+        if (isPlaying) {
+            while (true) {
+                withFrameMillis { _ ->
+                    val now = System.nanoTime()
+                    // Calcular segundos reales del sistema transcurridos desde el último pulso de YT
+                    val elapsedSystemSeconds = (now - systemTimeAtLastUpdate) / 1_000_000_000f
+
+                    // Extrapolar el tiempo teniendo en cuenta la velocidad de reproducción
+                    val extrapolatedTime = lastYoutubeTime + (elapsedSystemSeconds * playbackSpeed)
+
+                    // Inyectar directamente al WebView sin pasar por recomposiciones de Compose
+                    partituraWebViewRef.value?.evaluateJavascript(
+                        "correctAutoScrollTime($extrapolatedTime);",
+                        null
+                    )
+                }
+            }
+        }
+    }
+    // ----------------------------------------
 
     LaunchedEffect(song) {
         viewModel.loadSong(song)
@@ -54,7 +95,14 @@ fun PlayerScreen(
             videoId = song.youtubeVideoId,
             isPlaying = isPlaying,
             playbackSpeed = playbackSpeed,
-            onTimeUpdate = { seconds -> viewModel.updateCurrentTime(seconds) },
+            onTimeUpdate = { seconds ->
+                viewModel.updateCurrentTime(seconds)
+                partituraWebViewRef.value?.correctAutoScrollTime(seconds)
+            },
+            onDurationUpdate = { duration ->
+                videoDuration = duration
+                partituraWebViewRef.value?.evaluateJavascript("if (typeof window.setVideoDuration === 'function') { setVideoDuration($duration); }", null)
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp)
@@ -65,7 +113,16 @@ fun PlayerScreen(
             isPlaying = isPlaying,
             currentTime = currentTime,
             playbackSpeed = playbackSpeed,
-            onPlayPause = { viewModel.togglePlay() },
+            onPlayPause = {
+                // Calcular nuevo estado ANTES de toggle para evitar stale closure
+                val wasPlaying = isPlaying
+                viewModel.togglePlay()
+                if (wasPlaying) {
+                    partituraWebViewRef.value?.stopAutoScroll()
+                } else {
+                    partituraWebViewRef.value?.startAutoScroll(currentTime)
+                }
+            },
             onSpeedChange = { viewModel.setPlaybackSpeed(it) },
             modifier = Modifier
                 .fillMaxWidth()
@@ -87,10 +144,18 @@ fun PlayerScreen(
                 PartituraWebView(
                     urlArchivo = assetPath,
                     instrumentIndex = instrumentIndex,
+                    videoDuration = videoDuration,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(520.dp)
-                        .padding(vertical = 8.dp)
+                        .padding(vertical = 8.dp),
+                    onWebViewCreated = { webView ->
+                        partituraWebViewRef.value = webView
+                        // Configurar el scroll inicial si el video está reproduciéndose
+                        if (isPlaying) {
+                            webView.startAutoScroll(currentTime)
+                        }
+                    }
                 )
             }
         } ?: run {
@@ -126,6 +191,7 @@ private fun YouTubePlayerSection(
     isPlaying: Boolean,
     playbackSpeed: Float,
     onTimeUpdate: (Float) -> Unit,
+    onDurationUpdate: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(modifier = modifier, elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
@@ -133,6 +199,7 @@ private fun YouTubePlayerSection(
             videoId = videoId,
             autoplay = false,
             onCurrentSecond = onTimeUpdate,
+            onDurationReady = onDurationUpdate,
             externalControls = ExternalControls(
                 play = isPlaying,
                 playbackSpeed = playbackSpeed

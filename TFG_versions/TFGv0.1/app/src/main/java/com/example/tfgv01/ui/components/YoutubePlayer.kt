@@ -36,11 +36,13 @@ fun YouTubePlayer(
     videoId: String,
     autoplay: Boolean = false,
     onCurrentSecond: (Float) -> Unit = {},
+    onDurationReady: (Float) -> Unit = {},
     externalControls: ExternalControls? = null,
     modifier: Modifier = Modifier
 ) {
     val normalizedVideoId = remember(videoId) { videoId.extractYouTubeVideoId() }
     val latestOnCurrentSecond by rememberUpdatedState(onCurrentSecond)
+    val latestOnDurationReady by rememberUpdatedState(onDurationReady)
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
     DisposableEffect(Unit) {
@@ -67,7 +69,11 @@ fun YouTubePlayer(
                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
                 addJavascriptInterface(
-                    YouTubeBridge { seconds -> latestOnCurrentSecond(seconds) },
+                    YouTubeBridge(
+                        this,
+                        onSecondChanged = { seconds -> latestOnCurrentSecond(seconds) },
+                        onDurationChanged = { duration -> latestOnDurationReady(duration) }
+                    ),
                     "AndroidPlayer"
                 )
 
@@ -131,11 +137,22 @@ fun YouTubePlayer(
 }
 
 private class YouTubeBridge(
-    private val onSecondChanged: (Float) -> Unit
+    private val webView: WebView,
+    private val onSecondChanged: (Float) -> Unit,
+    private val onDurationChanged: (Float) -> Unit
 ) {
     @JavascriptInterface
     fun onCurrentSecond(seconds: Float) {
-        onSecondChanged(seconds)
+        webView.post {
+            onSecondChanged(seconds)
+        }
+    }
+
+    @JavascriptInterface
+    fun onDurationReady(duration: Float) {
+        webView.post {
+            onDurationChanged(duration)
+        }
     }
 }
 
@@ -237,11 +254,21 @@ private fun buildYouTubeHtml(videoId: String, autoplay: Boolean): String {
                     }
                 }
 
-                function reportCurrentSecond() {
-                    if (player && player.getCurrentTime && window.AndroidPlayer) {
-                        window.AndroidPlayer.onCurrentSecond(player.getCurrentTime());
-                    }
-                }
+                 let durationReported = false;
+                 function reportCurrentSecond() {
+                     if (player && player.getCurrentTime && window.AndroidPlayer) {
+                         window.AndroidPlayer.onCurrentSecond(player.getCurrentTime());
+                         if (!durationReported && player.getDuration) {
+                             let d = player.getDuration();
+                             if (d > 0) {
+                                 if (window.AndroidPlayer.onDurationReady) {
+                                     window.AndroidPlayer.onDurationReady(d);
+                                     durationReported = true;
+                                 }
+                             }
+                         }
+                     }
+                 }
             </script>
         </body>
         </html>
