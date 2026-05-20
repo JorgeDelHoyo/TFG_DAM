@@ -2,8 +2,6 @@ package com.example.tfgv01.ui.screens
 
 import android.webkit.WebView
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
@@ -22,7 +20,6 @@ import com.example.tfgv01.ui.components.ExternalControls
 import com.example.tfgv01.ui.components.correctAutoScrollTime
 import com.example.tfgv01.ui.components.startAutoScroll
 import com.example.tfgv01.ui.components.stopAutoScroll
-import com.example.tfgv01.ui.components.updateScrollPosition
 import com.example.tfgv01.ui.viewmodel.PlayerViewModel
 
 @Composable
@@ -75,26 +72,29 @@ fun PlayerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.navigationBars) // Asegura espacio físico real sobre los botones de Android
+            .windowInsetsPadding(WindowInsets.navigationBars) // Blindaje contra la barra nativa de Android
     ) {
-        // --- ESTRUCTURA PRINCIPAL (Fondo) ---
+        // --- CAPA INFERIOR: Interfaz Principal ---
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
-            IconButton(onClick = onNavigateBack, modifier = Modifier.align(Alignment.Start)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
-            }
+            // Cabecera de la canción arriba (ahora sin el botón volver estorbando)
+            SongHeader(song = song, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
 
-            SongHeader(song = song, modifier = Modifier.padding(vertical = 4.dp))
+            // Selector de instrumento justo bajo la cabecera
+            InstrumentSelector(
+                availableInstruments = song.tabs.keys.toList(),
+                selectedInstrument = selectedInstrument,
+                onInstrumentSelected = { viewModel.selectInstrument(it) },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+            )
 
-            // 1º PARTE: LA PARTITURA (Usa weight para absorber el espacio elástico central)
+            // LA PARTITURA: Ahora se expande muchísimo más al no tener elementos arriba ni abajo
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(vertical = 4.dp)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 tabAssetPath?.let { assetPath ->
                     val instrumentIndex = song.tabs.keys.toList().indexOf(selectedInstrument).coerceAtLeast(0)
@@ -122,45 +122,81 @@ fun PlayerScreen(
                 }
             }
 
-            // --- CONTENEDOR DE CONTROL FIJO ---
-            // Al agruparlos aquí abajo sin weights, garantizamos que el sistema calcule primero su tamaño
-            // completo y no los aplaste nunca.
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 4.dp)
+            // NUEVA BOTTOM BAR GENEROSA Y MODERNA
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                tonalElevation = 6.dp, // Le da un tono grisáceo/elevado muy elegante acorde a Material 3
+                shadowElevation = 8.dp
             ) {
-                // 2º PARTE: SELECTOR DE INSTRUMENTO
-                InstrumentSelector(
-                    availableInstruments = song.tabs.keys.toList(),
-                    selectedInstrument = selectedInstrument,
-                    onInstrumentSelected = { viewModel.selectInstrument(it) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // 3º PARTE: CONTROLES DE REPRODUCCIÓN
-                PlaybackControls(
-                    isPlaying = isPlaying,
-                    currentTime = currentTime,
-                    playbackSpeed = playbackSpeed,
-                    onPlayPause = {
-                        val wasPlaying = isPlaying
-                        viewModel.togglePlay()
-                        if (wasPlaying) {
-                            partituraWebViewRef.value?.stopAutoScroll()
-                        } else {
-                            partituraWebViewRef.value?.startAutoScroll(currentTime)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    // Fila 1 de la barra: Tiempo y Control de Velocidad
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "⏱️ ${String.format("%.1f", currentTime)}s",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("🎚️ Velocidad:", style = MaterialTheme.typography.labelMedium)
+                            Slider(
+                                value = playbackSpeed,
+                                onValueChange = { viewModel.setPlaybackSpeed(it) },
+                                valueRange = 0.25f..2.0f,
+                                steps = 3,
+                                modifier = Modifier.width(130.dp).padding(horizontal = 4.dp)
+                            )
+                            Text("${playbackSpeed}x", style = MaterialTheme.typography.labelMedium)
                         }
-                    },
-                    onSpeedChange = { viewModel.setPlaybackSpeed(it) },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Fila 2 de la barra: Botón Volver, Botón Play y hueco para el Vídeo Flotante
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Botón de Volver (Esquina izquierda de la barra)
+                        FilledTonalIconButton(onClick = onNavigateBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                        }
+
+                        Spacer(modifier = Modifier.weight(0.4f)) // Empuja el Play al centro relativo
+
+                        // Botón de Play/Pause (Centro de la barra)
+                        FloatingActionButton(
+                            onClick = {
+                                val wasPlaying = isPlaying
+                                viewModel.togglePlay()
+                                if (wasPlaying) {
+                                    partituraWebViewRef.value?.stopAutoScroll()
+                                } else {
+                                    partituraWebViewRef.value?.startAutoScroll(currentTime)
+                                }
+                            },
+                            modifier = Modifier.size(56.dp)
+                        ) {
+                            val icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
+                            Icon(imageVector = icon, contentDescription = "Play/Pause", modifier = Modifier.size(28.dp))
+                        }
+
+                        // Espacio en blanco reservado a la derecha de la barra (weight)
+                        // Aquí es exactamente donde se posará visualmente la ventana flotante de YT
+                        Spacer(modifier = Modifier.weight(1.2f))
+                    }
+                }
             }
         }
 
-        // --- VENTANA FLOTANTE DEL REPRODUCTOR (Capa Superior) ---
+        // --- CAPA SUPERIOR: Ventana flotante de YouTube perfectamente acoplada ---
         YouTubePlayerSection(
             videoId = song.youtubeVideoId,
             isPlaying = isPlaying,
@@ -174,14 +210,14 @@ fun PlayerScreen(
                 partituraWebViewRef.value?.evaluateJavascript("if (typeof window.setVideoDuration === 'function') { setVideoDuration($duration); }", null)
             },
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                // Se posiciona flotando elegantemente justo por encima de los controles blindados
-                .padding(bottom = 125.dp, end = 12.dp)
-                .width(180.dp)  // Tamaño equilibrado tipo miniatura
-                .height(101.dp) // Proporción estricta 16:9
+                .align(Alignment.BottomEnd) // Lo ancla abajo a la derecha
+                .padding(bottom = 8.dp, end = 12.dp) // Alineado limpiamente dentro del margen de la Bottom Bar
+                .width(150.dp)  // Tamaño ideal tipo miniatura de esquina
+                .height(84.dp)  // Relación de aspecto 16:9 exacta
         )
     }
 }
+
 private fun String.toAssetPath(): String = trim()
     .removePrefix("file:///android_asset/")
     .removePrefix("android_asset/")
@@ -189,7 +225,11 @@ private fun String.toAssetPath(): String = trim()
 
 @Composable
 private fun SongHeader(song: Song, modifier: Modifier = Modifier) {
-    Column(modifier = modifier.padding(horizontal = 16.dp)) {
+    Column(
+        modifier = modifier
+            .statusBarsPadding() // 👈 Evita que el título se meta debajo de la hora/batería del móvil
+            .padding(horizontal = 16.dp, vertical = 8.dp) // Le da un aire extra muy limpio
+    ) {
         Text(text = song.title, style = MaterialTheme.typography.headlineMedium)
         Text(text = song.artist, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (song.difficulty.isNotBlank()) {
@@ -209,7 +249,7 @@ private fun YouTubePlayerSection(
 ) {
     Card(
         modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp) // Aumentado la sombra para que se note el efecto flotante
+        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp) // Sombra pronunciada para destacar la flotabilidad sobre la barra
     ) {
         YouTubePlayer(
             videoId = videoId,
@@ -226,47 +266,6 @@ private fun YouTubePlayerSection(
 }
 
 @Composable
-private fun PlaybackControls(
-    isPlaying: Boolean,
-    currentTime: Float,
-    playbackSpeed: Float,
-    onPlayPause: () -> Unit,
-    onSpeedChange: (Float) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(modifier = modifier.padding(horizontal = 16.dp)) {
-        Text(
-            text = "⏱️ ${String.format("%.1f", currentTime)}s",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            FloatingActionButton(onClick = onPlayPause) {
-                val icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow
-                val description = if (isPlaying) "Pausar" else "Reproducir"
-                Icon(imageVector = icon, contentDescription = description)
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("🎚️ Velocidad:", style = MaterialTheme.typography.labelMedium)
-                Slider(
-                    value = playbackSpeed,
-                    onValueChange = onSpeedChange,
-                    valueRange = 0.25f..2.0f,
-                    steps = 3,
-                    modifier = Modifier.width(120.dp)
-                )
-                Text("${playbackSpeed}x", style = MaterialTheme.typography.labelMedium)
-            }
-        }
-    }
-}
-
-@Composable
 private fun InstrumentSelector(
     availableInstruments: List<String>,
     selectedInstrument: String,
@@ -274,7 +273,7 @@ private fun InstrumentSelector(
     modifier: Modifier = Modifier
 ) {
     if (availableInstruments.size <= 1) return
-    Column(modifier = modifier.padding(horizontal = 16.dp)) {
+    Column(modifier = modifier.padding(horizontal = 8.dp)) {
         Text("🎸 Instrumento:", style = MaterialTheme.typography.labelMedium)
         ScrollableTabRow(selectedTabIndex = availableInstruments.indexOf(selectedInstrument), edgePadding = 0.dp, modifier = Modifier.padding(top = 4.dp)) {
             availableInstruments.forEach { instrument ->

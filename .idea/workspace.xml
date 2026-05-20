@@ -11,7 +11,7 @@
   <component name="ChangeListManager">
     <list default="true" id="969e75e4-9e7a-4344-86f6-0c52a4ae5fcb" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/assets/player.html" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/assets/player.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/components/YoutubePlayer.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/components/YoutubePlayer.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/screens/PlayerScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/screens/PlayerScreen.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />

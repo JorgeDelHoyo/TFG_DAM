@@ -27,7 +27,8 @@ import java.io.ByteArrayInputStream
 
 data class ExternalControls(
     val play: Boolean = false,
-    val playbackSpeed: Float = 1.0f
+    val playbackSpeed: Float = 1.0f,
+    val isMuted: Boolean = false // 👈 Agregamos el estado de mute
 )
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -131,6 +132,9 @@ fun YouTubePlayer(
                     "if (window.setPlaybackSpeed) { setPlaybackSpeed(${controls.playbackSpeed.toValidYouTubeRate()}); }",
                     null
                 )
+                // 👈 Evaluamos dinámicamente si hay que mutear o desmutear en el JS
+                val muteCommand = if (controls.isMuted) "muteVideo" else "unmuteVideo"
+                webView.evaluateJavascript("if (window.$muteCommand) { $muteCommand(); }", null)
             }
         }
     )
@@ -205,6 +209,7 @@ private fun buildYouTubeHtml(videoId: String, autoplay: Boolean): String {
                 let player = null;
                 let pendingPlay = false;
                 let pendingRate = 1;
+                let pendingMute = false; // Guardado por si la API no está lista
 
                 function onYouTubeIframeAPIReady() {
                     player = new YT.Player('player', {
@@ -218,9 +223,8 @@ private fun buildYouTubeHtml(videoId: String, autoplay: Boolean): String {
 
                 function onPlayerReady() {
                     setPlaybackSpeed(pendingRate);
-                    if (pendingPlay) {
-                        player.playVideo();
-                    }
+                    if (pendingPlay) { player.playVideo(); }
+                    if (pendingMute) { player.mute(); } else { player.unMute(); }
                     setInterval(reportCurrentSecond, 500);
                     console.log('[YT] player ready');
                 }
@@ -235,23 +239,28 @@ private fun buildYouTubeHtml(videoId: String, autoplay: Boolean): String {
 
                 function playVideo() {
                     pendingPlay = true;
-                    if (player && player.playVideo) {
-                        player.playVideo();
-                    }
+                    if (player && player.playVideo) { player.playVideo(); }
                 }
 
                 function pauseVideo() {
                     pendingPlay = false;
-                    if (player && player.pauseVideo) {
-                        player.pauseVideo();
-                    }
+                    if (player && player.pauseVideo) { player.pauseVideo(); }
                 }
 
                 function setPlaybackSpeed(rate) {
                     pendingRate = rate;
-                    if (player && player.setPlaybackRate) {
-                        player.setPlaybackRate(rate);
-                    }
+                    if (player && player.setPlaybackRate) { player.setPlaybackRate(rate); }
+                }
+
+                // 👈 Funciones JS mapeadas para la API de YouTube
+                function muteVideo() {
+                    pendingMute = true;
+                    if (player && player.mute) { player.mute(); }
+                }
+
+                function unmuteVideo() {
+                    pendingMute = false;
+                    if (player && player.unMute) { player.unMute(); }
                 }
 
                  let durationReported = false;
