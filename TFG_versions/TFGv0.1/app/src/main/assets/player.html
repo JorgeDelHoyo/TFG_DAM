@@ -19,12 +19,11 @@
         #alphaTab { width: 100% !important; background: #ffffff; position: relative; padding-bottom: 500px; }
 
         #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; display: none; z-index: 10; background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 8px; }
-        #debug-panel { position: fixed; top: 0; left: 0; right: 0; background: rgba(255,255,0,0.95); color: #000; font-size: 11px; padding: 6px; max-height: 120px; overflow-y: auto; white-space: pre-wrap; z-index: 3000; border-bottom: 2px solid #ff0; font-family: monospace; pointer-events: none; }
 
         /* Ocultamos los cursores nativos bugeados para evitar dobles líneas */
         .at-cursor-beat, .at-selection, .at-cursor { display: none !important; }
 
-        /* 🎯 EL NUEVO CURSOR MAESTRO INMUNE */
+        /* 🎯 EL CURSOR MAESTRO INMUNE */
         #master-cursor {
             position: absolute;
             background-color: rgba(255, 0, 0, 0.22) !important;
@@ -35,19 +34,9 @@
             box-sizing: border-box;
             transition: left 0.15s linear, top 0.2s ease-out; /* Desplazamiento ultra suave */
         }
-
-        #control-test { position: fixed; bottom: 10px; right: 10px; z-index: 4000; background: #00ffff; padding: 10px; border-radius: 8px; font-family: sans-serif; }
-        #control-test button { font-weight: bold; padding: 6px 12px; margin: 2px; background: #000; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
     </style>
 </head>
 <body>
-<div id="debug-panel">🔍 Inicializando motor maestro de compases...</div>
-
-<div id="control-test">
-    <div style="font-size:10px; color:#000; margin-bottom:4px; text-align:center;">TEST COMPASES</div>
-    <button onclick="testSimularAvance()">▶️ Simular Vídeo</button>
-    <button onclick="testDetener()">⏹️ Parar</button>
-</div>
 
 <div class="at-container" id="scroll-container">
     <div id="alphaTab"></div>
@@ -65,12 +54,11 @@
     var testSegundos = 0;
     var ultimoRenglonY = -1;
     var masterCursorEl = null;
-    var cajasCompases = []; // Almacenará la geometría de los compases 1, 2 y 3
+    var cajasCompases = []; // Almacenará la geometría de los compases
 
+    // Mantenemos la función de debug en silencio para no romper llamadas del flujo
     function debug(m) {
         console.log('[JS]', m);
-        var p = document.getElementById('debug-panel');
-        if (p) p.textContent = '[JS] ' + m + '\n' + p.textContent;
     }
 
     api = new alphaTab.AlphaTabApi(document.getElementById('alphaTab'), {
@@ -83,12 +71,8 @@
         api.scoreLoaded.on(function(s) {
             totalDuration = s.duration || 60;
             totalTicks = s.endTick || 96000;
-            debug('🎵 Partitura cargada. Duración original: ' + totalDuration + 's');
             if (!hasExternalDuration) {
                 VIDEO_TOTAL_DURATION = totalDuration;
-                debug('⏱️ Duración de la partitura usada por defecto: ' + VIDEO_TOTAL_DURATION + 's');
-            } else {
-                debug('⏱️ Manteniendo duración externa del vídeo: ' + VIDEO_TOTAL_DURATION + 's');
             }
         });
     }
@@ -98,7 +82,6 @@
             document.getElementById('loading').style.display = 'none';
             masterCursorEl = document.getElementById('master-cursor');
 
-            debug('⏳ Render finalizado. Calculando mapa de compases...');
             setTimeout(function() {
                 mapearCompasesDesdeGeometria();
             }, 500);
@@ -111,19 +94,11 @@
         ultimoRenglonY = -1;
 
         if (!api.score || !api.score.masterBars) {
-            debug('❌ Error crítico: Estructura del score ausente.');
             return;
         }
 
         try {
             var lookup = api.boundsLookup || (api.renderer ? api.renderer.boundsLookup : null);
-            debug('🔍 lookup: ' + (lookup ? 'sí' : 'no'));
-            if (lookup) {
-                debug('🔍 lookup keys: ' + Object.keys(lookup).join(', '));
-                if (lookup.staffSystems && lookup.staffSystems.length > 0) {
-                    debug('🔍 first system keys: ' + Object.keys(lookup.staffSystems[0]).join(', '));
-                }
-            }
 
             if (lookup && lookup.staffSystems) {
                 lookup.staffSystems.forEach(function(system) {
@@ -159,12 +134,10 @@
 
             if (cajasCompases.length > 0) {
                 isInitialized = true;
-                debug('📦 ¡Mapa de compases completado! Detectados y guardados: ' + cajasCompases.length + ' compases.');
             } else {
                 // Plan B de emergencia: Si el mapeo falla, leemos los elementos SVG del DOM generados para los compases
                 var svgBars = document.querySelectorAll('.at-bar, svg g');
                 if(svgBars.length > 0) {
-                    // Simulación controlada dividiendo la altura total entre el número de elementos detectados
                     var totalH = document.getElementById('alphaTab').clientHeight || 600;
                     var numBars = Math.max(3, api.score.masterBars.length);
                     var altoIndividual = totalH / numBars;
@@ -178,14 +151,12 @@
                         });
                     }
                     isInitialized = true;
-                    debug('📦 Modo Adaptativo por Bloques Activo (' + cajasCompases.length + ' zonas).');
                 } else {
-                    debug('⚠️ Componentes visuales no listos en el DOM. Reintentando en 400ms...');
                     setTimeout(mapearCompasesDesdeGeometria, 400);
                 }
             }
         } catch (e) {
-            debug('❌ Fallo en mapeo de compases: ' + e.message);
+            console.error('Fallo en mapeo de compases: ' + e.message);
         }
     }
 
@@ -224,26 +195,24 @@
             masterCursorEl.style.top = (compas.y + 4) + 'px';
             masterCursorEl.style.width = anchoCursorNota + 'px';
             masterCursorEl.style.height = (compas.h - 8) + 'px';
-            
+
             // Forzar reflujo del navegador
             void masterCursorEl.offsetWidth;
-            
-            // Restaurar transición para movimiento horizontal suave (adaptada a la tasa de reporte)
+
+            // Restaurar transición para movimiento horizontal suave
             masterCursorEl.style.transition = 'left 0.2s linear, width 0.2s ease, height 0.2s ease';
-            
+
             ultimoRenglonY = compas.y;
             var container = document.getElementById('scroll-container');
             if (container) {
-                // Posicionamos el compás un 15% por debajo del techo superior de la pantalla
                 var targetScroll = compas.y - (container.clientHeight * 0.15);
                 if (targetScroll < 0) targetScroll = 0;
 
-                // Scroll suave del contenedor
+                // Scroll del contenedor
                 container.scrollTo({
                     top: targetScroll,
                     behavior: 'smooth'
                 });
-                debug('⚡ Salto de pantalla al compás: ' + (indexCompasActual + 1));
             }
         } else {
             masterCursorEl.style.left = cursorX + 'px';
@@ -253,36 +222,8 @@
         }
     }
 
-    // 🧪 SIMULADOR EN TIEMPO REAL
-    function testSimularAvance() {
-        testDetener();
-        if (!isInitialized) {
-            debug('⚠️ Esperando a que el mapa geométrico esté listo...');
-            return;
-        }
-        debug('🧪 Iniciando avance continuo...');
-        testInterval = setInterval(function() {
-            testSegundos += 0.2;
-            if (testSegundos > VIDEO_TOTAL_DURATION) {
-                testDetener();
-                return;
-            }
-
-            if (Math.abs(testSegundos % 2) < 0.15) {
-                debug('⏱️ Tiempo: ' + Math.round(testSegundos) + 's / ' + VIDEO_TOTAL_DURATION + 's');
-            }
-
-            sincronizarConVideo(testSegundos);
-        }, 200);
-    }
-
-    function testDetener() {
-        if (testInterval) { clearInterval(testInterval); testInterval = null; }
-        testSegundos = 0;
-        ultimoRenglonY = -1;
-        if (masterCursorEl) masterCursorEl.style.display = 'none';
-        debug('⏹️ Simulación detenida.');
-    }
+    function testSimularAvance() {}
+    function testDetener() {}
 
     // 🎛️ COUPLING ANDROID / KOTLIN
     function correctAutoScrollTime(time) { sincronizarConVideo(time); }
@@ -294,29 +235,26 @@
         if (duration && Number(duration) > 0) {
             VIDEO_TOTAL_DURATION = Number(duration);
             hasExternalDuration = true;
-            debug('⏱️ Duración del vídeo actualizada desde Android: ' + VIDEO_TOTAL_DURATION + 's');
         }
     }
 
     function loadSong(fileName, trackIndex, duration) {
-        debug('📂 Cargando: ' + fileName);
         pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
         if (duration && Number(duration) > 0) {
             VIDEO_TOTAL_DURATION = Number(duration);
             hasExternalDuration = true;
-            debug('⏱️ Duración inicial del vídeo recibida: ' + VIDEO_TOTAL_DURATION + 's');
         } else {
             hasExternalDuration = false;
         }
         document.getElementById('loading').style.display = 'block';
-        isInitialized = false; testDetener();
+        isInitialized = false;
         api.load(fileName.startsWith('http') ? fileName : 'https://appassets.androidplatform.net/assets/' + fileName.replace(/^\/+/, ''), [pendingTrackIndex]);
     }
 
     function changeTrack(trackIndex) {
         pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
         if (api && api.score) {
-            isInitialized = false; testDetener();
+            isInitialized = false;
             api.renderTracks([api.score.tracks[pendingTrackIndex]]);
         }
     }
