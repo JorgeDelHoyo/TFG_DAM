@@ -72,15 +72,16 @@ fun PlayerScreen(
         viewModel.loadSong(song)
     }
 
-    // Cambiamos el contenedor raíz a Box para permitir superposición de capas
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(8.dp)
+            .windowInsetsPadding(WindowInsets.navigationBars) // Asegura espacio físico real sobre los botones de Android
     ) {
-        // CAPA DEL FONDO: Toda la interfaz principal (Fija, sin scroll de pantalla)
+        // --- ESTRUCTURA PRINCIPAL (Fondo) ---
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp)
         ) {
             IconButton(onClick = onNavigateBack, modifier = Modifier.align(Alignment.Start)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
@@ -88,7 +89,7 @@ fun PlayerScreen(
 
             SongHeader(song = song, modifier = Modifier.padding(vertical = 4.dp))
 
-            // La partitura pasa arriba y se estira para usar todo el espacio libre
+            // 1º PARTE: LA PARTITURA (Usa weight para absorber el espacio elástico central)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -121,38 +122,45 @@ fun PlayerScreen(
                 }
             }
 
-            // Selector de instrumento fijo abajo
-            InstrumentSelector(
-                availableInstruments = song.tabs.keys.toList(),
-                selectedInstrument = selectedInstrument,
-                onInstrumentSelected = { viewModel.selectInstrument(it) },
+            // --- CONTENEDOR DE CONTROL FIJO ---
+            // Al agruparlos aquí abajo sin weights, garantizamos que el sistema calcule primero su tamaño
+            // completo y no los aplaste nunca.
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-            )
+                    .padding(top = 8.dp, bottom = 4.dp)
+            ) {
+                // 2º PARTE: SELECTOR DE INSTRUMENTO
+                InstrumentSelector(
+                    availableInstruments = song.tabs.keys.toList(),
+                    selectedInstrument = selectedInstrument,
+                    onInstrumentSelected = { viewModel.selectInstrument(it) },
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-            // Controles de reproducción fijos abajo del todo
-            PlaybackControls(
-                isPlaying = isPlaying,
-                currentTime = currentTime,
-                playbackSpeed = playbackSpeed,
-                onPlayPause = {
-                    val wasPlaying = isPlaying
-                    viewModel.togglePlay()
-                    if (wasPlaying) {
-                        partituraWebViewRef.value?.stopAutoScroll()
-                    } else {
-                        partituraWebViewRef.value?.startAutoScroll(currentTime)
-                    }
-                },
-                onSpeedChange = { viewModel.setPlaybackSpeed(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-            )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 3º PARTE: CONTROLES DE REPRODUCCIÓN
+                PlaybackControls(
+                    isPlaying = isPlaying,
+                    currentTime = currentTime,
+                    playbackSpeed = playbackSpeed,
+                    onPlayPause = {
+                        val wasPlaying = isPlaying
+                        viewModel.togglePlay()
+                        if (wasPlaying) {
+                            partituraWebViewRef.value?.stopAutoScroll()
+                        } else {
+                            partituraWebViewRef.value?.startAutoScroll(currentTime)
+                        }
+                    },
+                    onSpeedChange = { viewModel.setPlaybackSpeed(it) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
-        // CAPA SUPERIOR: El reproductor de YouTube como ventana flotante mini
+        // --- VENTANA FLOTANTE DEL REPRODUCTOR (Capa Superior) ---
         YouTubePlayerSection(
             videoId = song.youtubeVideoId,
             isPlaying = isPlaying,
@@ -166,14 +174,14 @@ fun PlayerScreen(
                 partituraWebViewRef.value?.evaluateJavascript("if (typeof window.setVideoDuration === 'function') { setVideoDuration($duration); }", null)
             },
             modifier = Modifier
-                .align(Alignment.BottomEnd) // <- Lo ubica abajo a la derecha
-                .padding(bottom = 120.dp, end = 16.dp) // <- Separación para no tapar los botones de Play/Slider
-                .width(160.dp)  // <- Ancho de ventana flotante (relación de aspecto 16:9 aprox)
-                .height(90.dp)   // <- Alto de ventana flotante
+                .align(Alignment.BottomEnd)
+                // Se posiciona flotando elegantemente justo por encima de los controles blindados
+                .padding(bottom = 125.dp, end = 12.dp)
+                .width(180.dp)  // Tamaño equilibrado tipo miniatura
+                .height(101.dp) // Proporción estricta 16:9
         )
     }
 }
-
 private fun String.toAssetPath(): String = trim()
     .removePrefix("file:///android_asset/")
     .removePrefix("android_asset/")
@@ -199,7 +207,10 @@ private fun YouTubePlayerSection(
     onDurationUpdate: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(modifier = modifier, elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
+    Card(
+        modifier = modifier,
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp) // Aumentado la sombra para que se note el efecto flotante
+    ) {
         YouTubePlayer(
             videoId = videoId,
             autoplay = false,
@@ -224,7 +235,11 @@ private fun PlaybackControls(
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.padding(horizontal = 16.dp)) {
-        Text(text = "⏱️ ${String.format("%.1f", currentTime)}s", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = "⏱️ ${String.format("%.1f", currentTime)}s",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
