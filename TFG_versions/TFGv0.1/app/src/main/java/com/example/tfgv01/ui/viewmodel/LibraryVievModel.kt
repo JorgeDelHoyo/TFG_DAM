@@ -1,22 +1,30 @@
 // app/src/main/java/com/example/tfgv01/ui/viewmodel/LibraryViewModel.kt
 package com.example.tfgv01.ui.viewmodel
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.tfgv01.data.model.Song
 import com.example.tfgv01.data.repository.SongRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// 🎯 Estados posibles de la UI (patrón UI State)
 sealed interface LibraryUiState {
     object Loading : LibraryUiState
-    data class Success(val songs: List<Song>) : LibraryUiState
+    data class Success(
+        val remoteSongs: List<Song>,
+        val localSongs: List<Song>,
+        val isLocalExpanded: Boolean = false
+    ) : LibraryUiState
     data class Error(val message: String) : LibraryUiState
+}
+
+sealed interface LibraryUiEvent {
+    data class ShowToast(val message: String) : LibraryUiEvent
+    object SongAddedSuccess : LibraryUiEvent
 }
 
 @HiltViewModel
@@ -24,34 +32,65 @@ class LibraryViewModel @Inject constructor(
     private val repository: SongRepository
 ) : ViewModel() {
 
-    // 📡 Estado público: la UI observa este Flow
     private val _uiState = MutableStateFlow<LibraryUiState>(LibraryUiState.Loading)
-    val uiState: StateFlow<LibraryUiState> = _uiState
+    val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
+
+    private val _uiEvent = Channel<LibraryUiEvent>(Channel.BUFFERED)
+    val uiEvent = _uiEvent.receiveAsFlow()
 
     init {
-        loadSongs()
+        loadAllSongsCombined()
     }
 
-    // 🔁 Carga canciones desde Firestore
-    private fun loadSongs() {
+    private fun loadAllSongsCombined() {
         viewModelScope.launch {
-            repository.getSongs()
-                .catch { e ->
-                    // Si hay error, emitimos estado Error
-                    _uiState.value = LibraryUiState.Error(
-                        message = e.message ?: "Error desconocido al cargar canciones"
-                    )
+            // Combinamos reactivamente el flujo de Firebase y el flujo de Room
+            combine(
+                repository.getSongs(),
+                repository.getLocalSongs()
+            ) { remote, local ->
+                val currentExpanded = (_uiState.value as? LibraryUiState.Success)?.isLocalExpanded ?: false
+                LibraryUiState.Success(
+                    remoteSongs = remote,
+                    localSongs = local,
+                    isLocalExpanded = currentExpanded
+                )
+            }.catch { e ->
+                _uiState.value = LibraryUiState.Error(
+                    message = e.message ?: "Error al sincronizar las bibliotecas"
+                )
+            }.collect { state ->
+                _uiState.value = state
+            }
+        }
+    }
+
+    fun toggleLocalExpanded() {
+        val currentState = _uiState.value
+        if (currentState is LibraryUiState.Success) {
+            _uiState.value = currentState.copy(isLocalExpanded = !currentState.isLocalExpanded)
+        }
+    }
+
+    fun addCustomSong(title: String, fileUri: Uri?) {
+        if (title.isBlank() || fileUri == null) {
+            viewModelScope.launch { _uiEvent.send(LibraryUiEvent.ShowToast("Campos inválidos")) }
+            return
+        }
+
+        viewModelScope.launch {
+            repository.saveLocalSong(title, fileUri)
+                .onSuccess {
+                    _uiEvent.send(LibraryUiEvent.SongAddedSuccess)
                 }
-                .collect { songs ->
-                    // Cuando llegan datos, emitimos estado Success
-                    _uiState.value = LibraryUiState.Success(songs)
+                .onFailure { error ->
+                    _uiEvent.send(LibraryUiEvent.ShowToast(error.localizedMessage ?: "Fallo al importar"))
                 }
         }
     }
 
-    // 🔄 Método público para refrescar manualmente (pull-to-refresh, retry, etc.)
     fun refresh() {
         _uiState.value = LibraryUiState.Loading
-        loadSongs()
+        loadAllSongsCombined()
     }
 }

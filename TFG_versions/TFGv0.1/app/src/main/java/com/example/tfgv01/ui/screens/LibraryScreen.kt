@@ -1,22 +1,34 @@
 // app/src/main/java/com/example/tfgv01/ui/screens/LibraryScreen.kt
 package com.example.tfgv01.ui.screens
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.tfgv01.data.model.Song
+import com.example.tfgv01.ui.viewmodel.LibraryUiEvent
 import com.example.tfgv01.ui.viewmodel.LibraryUiState
 import com.example.tfgv01.ui.viewmodel.LibraryViewModel
 
@@ -29,6 +41,21 @@ fun LibraryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var searchQuery by rememberSaveable { mutableStateOf("") }
+    var showAddDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    // Gestión limpia de eventos aislados (Toasts / Cierre de diálogos)
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { event ->
+            when (event) {
+                is LibraryUiEvent.ShowToast -> Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+                LibraryUiEvent.SongAddedSuccess -> {
+                    showAddDialog = false
+                    Toast.makeText(context, "¡Partitura añadida con éxito!", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     Scaffold(
         modifier = modifier,
@@ -37,32 +64,66 @@ fun LibraryScreen(
         }
     ) { padding ->
         when (val state = uiState) {
-
             is LibraryUiState.Loading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
-                    contentAlignment = Alignment.Center
-                ) {
+                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             }
 
             is LibraryUiState.Success -> {
-                if (state.songs.isEmpty()) {
-                    EmptyLibraryView(modifier = Modifier.padding(padding))
-                } else {
-                    val filteredSongs = remember(state.songs, searchQuery) {
-                        state.songs.filterByTitleOrArtist(searchQuery)
+                val filteredRemoteSongs = remember(state.remoteSongs, searchQuery) {
+                    state.remoteSongs.filterByTitleOrArtist(searchQuery)
+                }
+
+                Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+                    // Campo de búsqueda común superior
+                    SearchField(
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+
+                    if (state.remoteSongs.isEmpty() && state.localSongs.isEmpty()) {
+                        EmptyLibraryView(modifier = Modifier.weight(1f))
+                    } else {
+                        // Lista principal (Firebase)
+                        LazyColumn(
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            item {
+                                Text(
+                                    text = "Canciones de la Comunidad",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                )
+                            }
+
+                            if (filteredRemoteSongs.isEmpty()) {
+                                item {
+                                    Text(
+                                        text = "No hay canciones globales coincidentes",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                }
+                            }
+
+                            items(filteredRemoteSongs, key = { it.id }) { song ->
+                                SongItem(song = song, onClick = { onSongSelected(song) })
+                            }
+                        }
                     }
 
-                    SongList(
-                        songs = filteredSongs,
-                        searchQuery = searchQuery,
-                        onSearchQueryChange = { searchQuery = it },
-                        onSongClick = onSongSelected,
-                        modifier = Modifier.padding(padding)
+                    // Componente colapsable / dinámico para las canciones locales propias
+                    LocalSongsSection(
+                        state = state,
+                        onHeaderClick = viewModel::toggleLocalExpanded,
+                        onAddSongClick = { showAddDialog = true },
+                        onSongClick = onSongSelected
                     )
                 }
             }
@@ -76,43 +137,144 @@ fun LibraryScreen(
             }
         }
     }
+
+    if (showAddDialog) {
+        AddSongDialog(
+            onDismiss = { showAddDialog = false },
+            onConfirm = { title, uri -> viewModel.addCustomSong(title, uri) }
+        )
+    }
 }
 
 @Composable
-private fun SongList(
-    songs: List<Song>,
-    searchQuery: String,
-    onSearchQueryChange: (String) -> Unit,
-    onSongClick: (Song) -> Unit,
-    modifier: Modifier = Modifier
+private fun LocalSongsSection(
+    state: LibraryUiState.Success,
+    onHeaderClick: () -> Unit,
+    onAddSongClick: () -> Unit,
+    onSongClick: (Song) -> Unit
 ) {
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .animateContentSize(), // Transición suave nativa al mutar la altura
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        item {
-            SearchField(
-                query = searchQuery,
-                onQueryChange = onSearchQueryChange
-            )
-        }
-
-        if (songs.isEmpty()) {
-            item {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onHeaderClick),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "No hay canciones que coincidan",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 16.dp)
+                    text = "Mis Canciones Propias (${state.localSongs.size})",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Icon(
+                    imageVector = if (state.isLocalExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null
                 )
             }
-        }
 
-        items(songs, key = { it.id }) { song ->
-            SongItem(song = song, onClick = { onSongClick(song) })
+            if (state.isLocalExpanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onAddSongClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Importar archivo .gp3 local")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (state.localSongs.isEmpty()) {
+                    Text(
+                        text = "Aún no has subido partituras personales.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 200.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(state.localSongs, key = { it.id }) { song ->
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onSongClick(song) },
+                                color = MaterialTheme.colorScheme.surface,
+                                shape = MaterialTheme.shapes.small
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(text = song.title, style = MaterialTheme.typography.bodyLarge)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun AddSongDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, Uri?) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+    var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    var fileName by remember { mutableStateOf("Ningún archivo cargado") }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        selectedUri = uri
+        fileName = uri?.lastPathSegment ?: "Archivo seleccionado"
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Nueva Partitura Propia") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Título del Tema") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Button(
+                    onClick = { filePickerLauncher.launch("*/*") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Buscar .gp3 en el dispositivo")
+                }
+                Text(text = fileName, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(title, selectedUri) },
+                enabled = title.isNotBlank() && selectedUri != null
+            ) { Text("Guardar") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
 }
 
 @Composable
@@ -126,14 +288,12 @@ private fun SearchField(
         onValueChange = onQueryChange,
         modifier = modifier.fillMaxWidth(),
         singleLine = true,
-        label = { Text("Buscar por titulo o artista") },
-        leadingIcon = {
-            Icon(Icons.Filled.Search, contentDescription = null)
-        },
+        label = { Text("Buscar por título o artista") },
+        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
         trailingIcon = {
             if (query.isNotBlank()) {
                 IconButton(onClick = { onQueryChange("") }) {
-                    Icon(Icons.Filled.Clear, contentDescription = "Limpiar busqueda")
+                    Icon(Icons.Filled.Clear, contentDescription = "Limpiar búsqueda")
                 }
             }
         }
@@ -145,21 +305,12 @@ private fun SongItem(song: Song, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
             .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = song.title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = song.artist,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(text = song.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+            Text(text = song.artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (song.difficulty.isNotBlank()) {
                 AssistChip(
                     onClick = {},
@@ -175,15 +326,13 @@ private fun SongItem(song: Song, onClick: () -> Unit) {
 @Composable
 private fun EmptyLibraryView(modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier = modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text("🎵 No hay canciones aún", style = MaterialTheme.typography.titleLarge)
         Text(
-            "Añade tu primera tablatura desde Firebase Console",
+            "Carga temas en Firebase o importa tus .gp3 locales.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -193,17 +342,11 @@ private fun EmptyLibraryView(modifier: Modifier = Modifier) {
 @Composable
 private fun ErrorView(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier = modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            "❌ $message",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.error
-        )
+        Text("❌ $message", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.error)
         Button(onClick = onRetry, modifier = Modifier.padding(top = 16.dp)) {
             Text("Reintentar")
         }
@@ -213,9 +356,8 @@ private fun ErrorView(message: String, onRetry: () -> Unit, modifier: Modifier =
 private fun List<Song>.filterByTitleOrArtist(query: String): List<Song> {
     val normalizedQuery = query.trim()
     if (normalizedQuery.isEmpty()) return this
-
     return filter { song ->
         song.title.contains(normalizedQuery, ignoreCase = true) ||
-            song.artist.contains(normalizedQuery, ignoreCase = true)
+                song.artist.contains(normalizedQuery, ignoreCase = true)
     }
 }

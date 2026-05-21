@@ -9,7 +9,22 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="969e75e4-9e7a-4344-86f6-0c52a4ae5fcb" name="Changes" comment="" />
+    <list default="true" id="969e75e4-9e7a-4344-86f6-0c52a4ae5fcb" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/data/local/Converters.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/di/LocalModule.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/screens/LocalPlayerScreen.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/viewmodel/LocalPlayerViewModel.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/MainActivity.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/data/local/AppDataBase.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/data/local/AppDataBase.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/data/local/CancionDao.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/data/local/CancionDao.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/data/model/Cancion.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/data/model/Cancion.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/data/repository/SongRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/data/repository/SongRepository.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/components/PartituraWebView.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/components/PartituraWebView.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/screens/LibraryScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/screens/LibraryScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/viewmodel/LibraryVievModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/viewmodel/LibraryVievModel.kt" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -39,6 +54,7 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
+        <option value="Kotlin Class" />
         <option value="Kotlin File" />
       </list>
     </option>
@@ -66,7 +82,7 @@
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "git-widget-placeholder": "dev",
+    "git-widget-placeholder": "upload-local-feature",
     "last_opened_file_path": "C:/Users/practicas02/Desktop/TFG_Diego/TFG_DAM/TFG_versions/TFGv0.1/settings.gradle.kts",
     "settings.editor.selected.configurable": "preferences.pluginManager"
   }

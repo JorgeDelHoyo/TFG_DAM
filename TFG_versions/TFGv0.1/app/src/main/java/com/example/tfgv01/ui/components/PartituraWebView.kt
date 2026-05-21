@@ -1,3 +1,4 @@
+// app/src/main/java/com/example/tfgv01/ui/components/PartituraWebView.kt
 package com.example.tfgv01.ui.components
 
 import android.util.Log
@@ -11,35 +12,50 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewAssetLoader
+import java.io.File
 
 @Composable
 fun PartituraWebView(
     urlArchivo: String,
     instrumentIndex: Int,
     videoDuration: Float,
+    esLocal: Boolean = false, // 🆕 Flag crítico para saber el origen de la canción
     modifier: Modifier = Modifier,
     onWebViewCreated: (WebView) -> Unit = {}
 ) {
     val safeInstrumentIndex = instrumentIndex.coerceAtLeast(0)
-    val safeUrlArchivo = remember(urlArchivo) {
-        urlArchivo
-            .trim()
-            .removePrefix("file:///android_asset/")
-            .removePrefix("android_asset/")
-            .removePrefix("assets/")
-            .replace("'", "\\'")
+
+    // Formateamos la ruta dependiendo de si es un archivo local del almacenamiento o un asset estático
+    val safeUrlArchivo = remember(urlArchivo, esLocal) {
+        val trimmed = urlArchivo.trim()
+        if (esLocal) {
+            // Extraemos solo el nombre físico del archivo (ej: user_tab_12345.gp3) de la ruta completa
+            val nombreArchivo = File(trimmed).name
+            // Le indicamos al JavaScript que acceda mediante el nuevo manejador virtual seguro
+            "https://appassets.androidplatform.net/local_files/$nombreArchivo"
+        } else {
+            // Flujo original intacto para Firebase/Assets
+            trimmed
+                .removePrefix("file:///android_asset/")
+                .removePrefix("android_asset/")
+                .removePrefix("assets/")
+                .replace("'", "\\'")
+        }
     }
 
-    Log.d("PARTITURA", "Cargando archivo: $safeUrlArchivo, índice: $safeInstrumentIndex")
+    Log.d("PARTITURA", "Cargando archivo (Modo Local=$esLocal): $safeUrlArchivo, índice: $safeInstrumentIndex")
 
     var webView: WebView? by remember { mutableStateOf(null) }
 
     AndroidView(
         factory = { context ->
-            // ✅ AssetLoader creado aquí, usando el 'context' del factory (NO LocalContext.current)
+            // 🆕 Creamos un AssetLoader con DOBLE manejador de rutas: Assets + Internal Storage
             val assetLoader = WebViewAssetLoader.Builder()
                 .setDomain("appassets.androidplatform.net")
+                // Manejador 1: Para player.html y partituras de la comunidad (Firebase)
                 .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))
+                // Manejador 2: Para abrir partituras .gp3 dinámicas subidas por el usuario en filesDir
+                .addPathHandler("/local_files/", WebViewAssetLoader.InternalStoragePathHandler(context, context.filesDir))
                 .build()
 
             WebView(context).apply {
@@ -64,12 +80,12 @@ fun PartituraWebView(
                     }
                 }
 
-                // ✅ WebViewClient con interceptor para WebViewAssetLoader
                 webViewClient = object : WebViewClient() {
                     override fun shouldInterceptRequest(
                         view: WebView?,
                         request: WebResourceRequest?
                     ): WebResourceResponse? {
+                        // El interceptor ahora resolverá tanto las peticiones de /assets/ como las de /local_files/
                         return request?.url?.let { assetLoader.shouldInterceptRequest(it) }
                             ?: super.shouldInterceptRequest(view, request)
                     }
@@ -77,16 +93,17 @@ fun PartituraWebView(
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
                         Log.d("PARTITURA", "WebView cargada, cargando canción: $safeUrlArchivo con duración: $videoDuration")
+
+                        // Enviamos la URL construida al motor JS de player.html
                         view?.evaluateJavascript("loadSong('$safeUrlArchivo', $safeInstrumentIndex, $videoDuration)") { result ->
                             Log.d("PARTITURA", "loadSong ejecutado: $result")
                         }
                     }
                 }
 
-                // ✅ Cargar player.html vía HTTPS (no file://)
+                // Cargar player.html vía HTTPS (Mantiene tu misma infraestructura)
                 loadUrl("https://appassets.androidplatform.net/assets/player.html")
 
-                // Guardar la referencia al WebView
                 webView = this
                 onWebViewCreated(this)
             }
@@ -116,7 +133,7 @@ fun PartituraWebView(
     )
 }
 
-// Funciones de extensión para controlar el scroll
+// 🔥 Tus funciones de extensión para controlar el scroll se quedan 100% intactas
 fun WebView.startAutoScroll(startTime: Float = 0f) {
     this.evaluateJavascript("startAutoScroll($startTime)") { result ->
         Log.d("PARTITURA", "Auto-scroll iniciado: $result")
