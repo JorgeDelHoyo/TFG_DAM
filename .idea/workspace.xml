@@ -11,9 +11,7 @@
   <component name="ChangeListManager">
     <list default="true" id="969e75e4-9e7a-4344-86f6-0c52a4ae5fcb" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/AndroidManifest.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/screens/PlayerScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/screens/PlayerScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/viewmodel/PlayerViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/viewmodel/PlayerViewModel.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -71,7 +69,7 @@
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
-    "git-widget-placeholder": "dev",
+    "git-widget-placeholder": "horizontalupgrade",
     "last_opened_file_path": "C:/Users/practicas02/Desktop/TFG_Diego/TFG_DAM/TFG_versions/TFGv0.1/settings.gradle.kts",
     "settings.editor.selected.configurable": "preferences.pluginManager"
   }

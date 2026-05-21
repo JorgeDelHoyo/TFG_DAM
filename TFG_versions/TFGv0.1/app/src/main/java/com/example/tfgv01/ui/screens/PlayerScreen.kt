@@ -1,6 +1,7 @@
 // app/src/main/java/com/example/tfgv01/ui/screens/PlayerScreen.kt
 package com.example.tfgv01.ui.screens
 
+import android.content.res.Configuration
 import android.webkit.WebView
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateDpAsState
@@ -18,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -36,8 +38,13 @@ fun PlayerScreen(
     val currentTime by viewModel.currentTime.collectAsStateWithLifecycle()
     val isMuted by viewModel.isMuted.collectAsStateWithLifecycle()
 
-    // 🚀 NUEVO ESTADO: Controla si la BottomBar está desplegada
+    // Controla si la BottomBar está desplegada
     var isBottomBarExpanded by rememberSaveable { mutableStateOf(false) }
+
+    // Detectamos de forma reactiva la orientación actual del terminal
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     val tabAssetPath = remember(song, selectedInstrument) {
         song.tabs[selectedInstrument]?.toAssetPath()
     }
@@ -112,8 +119,9 @@ fun PlayerScreen(
             }
         }
 
-        // 🔹 3. BOTTOM BAR DESPLEGABLE
-        val barHeight by animateDpAsState(targetValue = if (isBottomBarExpanded) 140.dp else 48.dp)
+        // 🔹 3. BOTTOM BAR DESPLEGABLE Y RESPONSIVA
+        val targetHeight = if (isBottomBarExpanded) (if (isLandscape) 115.dp else 140.dp) else 48.dp
+        val barHeight by animateDpAsState(targetValue = targetHeight)
 
         Surface(
             modifier = Modifier
@@ -163,49 +171,96 @@ fun PlayerScreen(
                             .padding(start = 24.dp, end = 24.dp, bottom = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // BLOQUE 1 (IZQUIERDA)
-                        Column(
-                            modifier = Modifier.wrapContentWidth(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            FilledTonalIconButton(onClick = { viewModel.toggleMute() }, modifier = Modifier.size(40.dp)) {
-                                Icon(if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp, null, Modifier.size(20.dp))
-                            }
-                            FilledTonalIconButton(onClick = onNavigateBack, modifier = Modifier.size(40.dp)) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, Modifier.size(20.dp))
-                            }
-                        }
+                        if (isLandscape) {
+                            // 🛠️ DISEÑO HORIZONTAL MEJORADO (Volver a la izquierda del todo + Botones más grandes)
 
-                        Spacer(modifier = Modifier.weight(1f))
+                            // Botón 1: Volver (Izquierda del todo)
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                FilledTonalIconButton(onClick = onNavigateBack, modifier = Modifier.size(48.dp)) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null, Modifier.size(24.dp))
+                                }
+                            }
 
-                        // BLOQUE 2 (CENTRO)
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text("⏱️ ${String.format("%.1f", currentTime)}s", style = MaterialTheme.typography.bodyMedium)
-                            FloatingActionButton(
-                                onClick = {
-                                    viewModel.togglePlay()
-                                    if (isPlaying) partituraWebViewRef.value?.stopAutoScroll()
-                                    else partituraWebViewRef.value?.startAutoScroll(currentTime)
-                                },
-                                modifier = Modifier.size(54.dp)
+                            // Botón 2: Mute (En el centro del bloque de botones)
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                FilledTonalIconButton(onClick = { viewModel.toggleMute() }, modifier = Modifier.size(48.dp)) {
+                                    Icon(if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp, null, Modifier.size(24.dp))
+                                }
+                            }
+
+                            // Botón 3: Segundos arriba + Botón Play abajo
+                            Column(
+                                modifier = Modifier.weight(1.2f),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
-                                Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(28.dp))
+                                Text(
+                                    text = "⏱️ ${String.format("%.1f", currentTime)}s",
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                                FloatingActionButton(
+                                    onClick = {
+                                        viewModel.togglePlay()
+                                        if (isPlaying) partituraWebViewRef.value?.stopAutoScroll()
+                                        else partituraWebViewRef.value?.startAutoScroll(currentTime)
+                                    },
+                                    modifier = Modifier.size(52.dp)
+                                ) {
+                                    Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(26.dp))
+                                }
                             }
+                        } else {
+                            // 📱 DISEÑO ORIGINAL ESPACIADO PARA MODO VERTICAL
+                            // BLOQUE 1 (IZQUIERDA)
+                            Column(
+                                modifier = Modifier.wrapContentWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                FilledTonalIconButton(onClick = { viewModel.toggleMute() }, modifier = Modifier.size(40.dp)) {
+                                    Icon(if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp, null, Modifier.size(20.dp))
+                                }
+                                FilledTonalIconButton(onClick = onNavigateBack, modifier = Modifier.size(40.dp)) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null, Modifier.size(20.dp))
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.weight(1f))
+
+                            // BLOQUE 2 VERTICAL (CENTRO)
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text("⏱️ ${String.format("%.1f", currentTime)}s", style = MaterialTheme.typography.bodyMedium)
+                                FloatingActionButton(
+                                    onClick = {
+                                        viewModel.togglePlay()
+                                        if (isPlaying) partituraWebViewRef.value?.stopAutoScroll()
+                                        else partituraWebViewRef.value?.startAutoScroll(currentTime)
+                                    },
+                                    modifier = Modifier.size(54.dp)
+                                ) {
+                                    Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(28.dp))
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.weight(1.3f))
                         }
 
-                        Spacer(modifier = Modifier.weight(1.3f))
-
-                        // BLOQUE 3 (DERECHA)
+                        // BLOQUE 3 (DERECHA) - El reproductor se ancla al final manteniendo sus proporciones estables
                         YouTubePlayerSection(
                             videoId = song.youtubeVideoId,
                             isPlaying = isPlaying,
                             isMuted = isMuted,
-                            onTimeUpdate = { viewModel.updateCurrentTime(it) },
-                            onDurationUpdate = { videoDuration = it },
+                            onTimeUpdate = { seconds ->
+                                viewModel.updateCurrentTime(seconds)
+                                partituraWebViewRef.value?.correctAutoScrollTime(seconds)
+                            },
+                            onDurationUpdate = { duration ->
+                                videoDuration = duration
+                                partituraWebViewRef.value?.evaluateJavascript("if (typeof window.setVideoDuration === 'function') { setVideoDuration($duration); }", null)
+                            },
                             modifier = Modifier.width(160.dp).height(90.dp)
                         )
                     }
