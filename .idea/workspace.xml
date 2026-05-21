@@ -11,8 +11,9 @@
   <component name="ChangeListManager">
     <list default="true" id="969e75e4-9e7a-4344-86f6-0c52a4ae5fcb" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/components/YoutubePlayer.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/components/YoutubePlayer.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/AndroidManifest.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/screens/PlayerScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/screens/PlayerScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/viewmodel/PlayerViewModel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/TFG_versions/TFGv0.1/app/src/main/java/com/example/tfgv01/ui/viewmodel/PlayerViewModel.kt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -22,7 +23,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[C:\Users\practicas02\.android\avd\Medium_Phone_API_30.avd]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[6TEMU4S46DZHPNZX]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$/TFG_versions/TFGv0.1">
       <ProjectState />
@@ -62,19 +63,19 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
-    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
-    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;player-window-feature&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/practicas02/Desktop/TFG_Diego/TFG_DAM/TFG_versions/TFGv0.1/settings.gradle.kts&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "git-widget-placeholder": "dev",
+    "last_opened_file_path": "C:/Users/practicas02/Desktop/TFG_Diego/TFG_DAM/TFG_versions/TFGv0.1/settings.gradle.kts",
+    "settings.editor.selected.configurable": "preferences.pluginManager"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\practicas02\Desktop\TFG_Diego\TFG_DAM\TFG_versions\TFGv0.1\build" />
