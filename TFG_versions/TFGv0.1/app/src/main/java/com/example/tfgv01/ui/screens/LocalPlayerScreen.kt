@@ -83,7 +83,6 @@ fun LocalPlayerScreen(
             exit = shrinkVertically() + fadeOut()
         ) {
             Column {
-                SongHeaderLocal(song = song, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
                 InstrumentSelectorLocal(
                     availableInstruments = uiState.availableInstruments,
                     selectedInstrument = uiState.selectedInstrument,

@@ -85,7 +85,6 @@ fun PlayerScreen(
             exit = shrinkVertically() + fadeOut()
         ) {
             Column {
-                SongHeader(song = song, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
                 InstrumentSelector(
                     availableInstruments = song.tabs.keys.toList(),
                     selectedInstrument = selectedInstrument,
