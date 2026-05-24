@@ -19,11 +19,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.BackHandler
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.tfgv01.data.model.Song
 import com.example.tfgv01.ui.components.PartituraWebView
 import com.example.tfgv01.ui.viewmodel.LocalPlayerViewModel
+import androidx.compose.foundation.layout.statusBarsPadding
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +34,11 @@ fun LocalPlayerScreen(
     onNavigateBack: () -> Unit,
     song: Song
 ) {
+
+    BackHandler(enabled = true) {
+        onNavigateBack() // Ejecuta el cambio de estado hacia "library" en vez de salir de la app
+    }
+
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     // Controla si la BottomBar está desplegada
@@ -41,28 +48,30 @@ fun LocalPlayerScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+    // 🎹 LÓGICA DE BPM: Fijamos un tempo original estándar para las partituras locales
+    val bpmOriginales = 120
+    // Calculamos los BPM actuales en base al multiplicador del estado
+    val bpmActuales = (bpmOriginales * uiState.currentTempoMultiplier).toInt()
+
     // Inicializar el ViewModel de forma segura
     LaunchedEffect(song) {
         viewModel.init(song)
     }
 
-    // 🛡️ BÚSQUEDA INTELIGENTE DE RUTA: Intenta usar el instrumento del estado.
-    // Si no coincide o está vacío al arrancar, toma la primera ruta física que haya en el mapa como salvavidas.
+    // 🛡️ BÚSQUEDA INTELIGENTE DE RUTA
     val currentLocalPath = remember(song, uiState.selectedInstrument) {
         song.tabs[uiState.selectedInstrument]
             ?: song.tabs.values.firstOrNull()
             ?: ""
     }
 
-    // Calculamos dinámicamente el índice real del instrumento para pasárselo de forma segura a AlphaTab
     val instrumentIndex = remember(uiState.availableInstruments, uiState.selectedInstrument) {
         uiState.availableInstruments.indexOf(uiState.selectedInstrument).coerceAtLeast(0)
     }
 
     val partituraWebViewRef = remember { mutableStateOf<WebView?>(null) }
 
-    // 🎯 TRANSPONSOR DE TIEMPO SEGURO (Sin bucles infinitos de frames)
-    // Cada vez que el Ticker del ViewModel actualice los segundos, se los inyectamos directamente al JS
+    // 🎯 TRANSPONSOR DE TIEMPO SEGURO
     LaunchedEffect(uiState.currentTimeSeconds) {
         if (uiState.isPlaying) {
             partituraWebViewRef.value?.evaluateJavascript(
@@ -75,8 +84,9 @@ fun LocalPlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.navigationBars)
+            .statusBarsPadding()
     ) {
-        // 🔹 1. CABECERA Y SELECTOR (Se ocultan al expandir la barra inferior)
+        // 🔹 1. CABECERA Y SELECTOR
         AnimatedVisibility(
             visible = !isBottomBarExpanded,
             enter = expandVertically() + fadeIn(),
@@ -99,7 +109,6 @@ fun LocalPlayerScreen(
                 .weight(1f)
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
-            // 🔍 Imprimimos la ruta en el Logcat para cazar el formato exacto
             LaunchedEffect(currentLocalPath) {
                 android.util.Log.d("RUTA_CRÍTICA", "El path que va al WebView es: '$currentLocalPath'")
             }
@@ -189,12 +198,15 @@ fun LocalPlayerScreen(
                         ) {
                             Icon(Icons.Default.Speed, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(8.dp))
+
+                            // 🚀 CAMBIO VISUAL: Muestra el tempo en BPM en lugar de porcentaje
                             Text(
-                                text = "Velocidad: ${(uiState.currentTempoMultiplier * 100).toInt()}%",
+                                text = "Tempo: $bpmActuales BPM",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.width(95.dp)
+                                modifier = Modifier.width(110.dp) // Un pelín más ancho para que quepa "BPM" holgadamente
                             )
+
                             Slider(
                                 value = uiState.currentTempoMultiplier,
                                 onValueChange = { viewModel.updateTempo(it) },

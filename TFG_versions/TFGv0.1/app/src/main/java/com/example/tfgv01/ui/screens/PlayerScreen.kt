@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.webkit.WebView
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateDpAsState
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -26,6 +27,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.tfgv01.data.model.Song
 import com.example.tfgv01.ui.components.*
 import com.example.tfgv01.ui.viewmodel.PlayerViewModel
+import androidx.compose.foundation.layout.statusBarsPadding
 
 @Composable
 fun PlayerScreen(
@@ -33,6 +35,10 @@ fun PlayerScreen(
     onNavigateBack: () -> Unit,
     song: Song
 ) {
+    BackHandler(enabled = true) {
+        onNavigateBack() // Ejecuta el cambio de estado hacia "library" en vez de salir de la app
+    }
+
     val selectedInstrument by viewModel.selectedInstrument.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val currentTime by viewModel.currentTime.collectAsStateWithLifecycle()
@@ -77,6 +83,7 @@ fun PlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.navigationBars)
+            .statusBarsPadding()
     ) {
         // 🔹 1. CABECERA Y SELECTOR (Se ocultan al expandir la barra inferior)
         AnimatedVisibility(

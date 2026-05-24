@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -22,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,9 +44,12 @@ fun LibraryScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var showAddDialog by remember { mutableStateOf(false) }
+
+    // Estados internos para controlar el diálogo de edición de nombre
+    var songToEdit by remember { mutableStateOf<Song?>(null) }
+
     val context = LocalContext.current
 
-    // Gestión limpia de eventos aislados (Toasts / Cierre de diálogos)
     LaunchedEffect(Unit) {
         viewModel.uiEvent.collect { event ->
             when (event) {
@@ -76,7 +81,6 @@ fun LibraryScreen(
                 }
 
                 Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-                    // Campo de búsqueda común superior
                     SearchField(
                         query = searchQuery,
                         onQueryChange = { searchQuery = it },
@@ -86,7 +90,6 @@ fun LibraryScreen(
                     if (state.remoteSongs.isEmpty() && state.localSongs.isEmpty()) {
                         EmptyLibraryView(modifier = Modifier.weight(1f))
                     } else {
-                        // Lista principal (Firebase)
                         LazyColumn(
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
@@ -118,12 +121,14 @@ fun LibraryScreen(
                         }
                     }
 
-                    // Componente colapsable / dinámico para las canciones locales propias
+                    // Se pasan las nuevas funciones lambda al componente de canciones locales
                     LocalSongsSection(
                         state = state,
                         onHeaderClick = viewModel::toggleLocalExpanded,
                         onAddSongClick = { showAddDialog = true },
-                        onSongClick = onSongSelected
+                        onSongClick = onSongSelected,
+                        onEditSongClick = { song -> songToEdit = song },
+                        onDeleteSongClick = { song -> viewModel.deleteSong(song) }
                     )
                 }
             }
@@ -144,6 +149,18 @@ fun LibraryScreen(
             onConfirm = { title, uri -> viewModel.addCustomSong(title, uri) }
         )
     }
+
+    // Diálogo emergente para editar nombre si hay una canción seleccionada para tal fin
+    songToEdit?.let { song ->
+        EditSongDialog(
+            song = song,
+            onDismiss = { songToEdit = null },
+            onConfirm = { newTitle ->
+                viewModel.updateSongTitle(song, newTitle)
+                songToEdit = null
+            }
+        )
+    }
 }
 
 @Composable
@@ -151,13 +168,15 @@ private fun LocalSongsSection(
     state: LibraryUiState.Success,
     onHeaderClick: () -> Unit,
     onAddSongClick: () -> Unit,
-    onSongClick: (Song) -> Unit
+    onSongClick: (Song) -> Unit,
+    onEditSongClick: (Song) -> Unit,
+    onDeleteSongClick: (Song) -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
-            .animateContentSize(), // Transición suave nativa al mutar la altura
+            .animateContentSize(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -204,6 +223,8 @@ private fun LocalSongsSection(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         items(state.localSongs, key = { it.id }) { song ->
+                            var menuExpanded by remember { mutableStateOf(false) }
+
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -212,12 +233,47 @@ private fun LocalSongsSection(
                                 shape = MaterialTheme.shapes.small
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Icon(Icons.Default.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(text = song.title, style = MaterialTheme.typography.bodyLarge)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(text = song.title, style = MaterialTheme.typography.bodyLarge)
+                                    }
+
+                                    // Menú de opciones contextual flotante de 3 puntos (Editar/Eliminar)
+                                    Box {
+                                        IconButton(onClick = { menuExpanded = true }) {
+                                            Icon(
+                                                imageVector = Icons.Default.MoreVert,
+                                                contentDescription = "Opciones de canción propia"
+                                            )
+                                        }
+                                        DropdownMenu(
+                                            expanded = menuExpanded,
+                                            onDismissRequest = { menuExpanded = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("Editar nombre") },
+                                                onClick = {
+                                                    menuExpanded = false
+                                                    onEditSongClick(song)
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Eliminar", color = Color.Red) },
+                                                onClick = {
+                                                    menuExpanded = false
+                                                    onDeleteSongClick(song)
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -226,6 +282,40 @@ private fun LocalSongsSection(
             }
         }
     }
+}
+
+@Composable
+private fun EditSongDialog(
+    song: Song,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var newTitle by remember { mutableStateOf(song.title) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editar Título de la Canción") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = newTitle,
+                    onValueChange = { newTitle = it },
+                    label = { Text("Título del Tema") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(newTitle) },
+                enabled = newTitle.isNotBlank() && newTitle != song.title
+            ) { Text("Guardar") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
 }
 
 @Composable

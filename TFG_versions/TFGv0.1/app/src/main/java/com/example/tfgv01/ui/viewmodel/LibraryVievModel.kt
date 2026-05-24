@@ -44,7 +44,6 @@ class LibraryViewModel @Inject constructor(
 
     private fun loadAllSongsCombined() {
         viewModelScope.launch {
-            // Combinamos reactivamente el flujo de Firebase y el flujo de Room
             combine(
                 repository.getSongs(),
                 repository.getLocalSongs()
@@ -61,6 +60,30 @@ class LibraryViewModel @Inject constructor(
                 )
             }.collect { state ->
                 _uiState.value = state
+            }
+        }
+    }
+
+    // ✅ NUEVA FUNCIÓN: Eliminar canción de Room
+    fun deleteSong(song: Song) {
+        viewModelScope.launch {
+            try {
+                repository.deleteLocalSong(song) // Asegúrate de propagar al repo o llama directo al dao si tu estructura lo permite
+            } catch (e: Exception) {
+                _uiEvent.send(LibraryUiEvent.ShowToast("Error al eliminar la canción"))
+            }
+        }
+    }
+
+    // ✅ NUEVA FUNCIÓN: Actualizar el nombre de una canción
+    fun updateSongTitle(song: Song, newTitle: String) {
+        if (newTitle.isBlank()) return
+        viewModelScope.launch {
+            try {
+                val updatedSong = song.copy(title = newTitle)
+                repository.updateLocalSong(updatedSong) // Propagar al repo
+            } catch (e: Exception) {
+                _uiEvent.send(LibraryUiEvent.ShowToast("Error al renombrar la canción"))
             }
         }
     }

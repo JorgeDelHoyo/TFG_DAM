@@ -58,23 +58,20 @@ class SongRepository @Inject constructor(
     // 💾 LOCAL: Guardar archivo .gp3 físico e insertar metadatos en Room
     suspend fun saveLocalSong(title: String, fileUri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            // Nombre físico único para evitar sobreescribir canciones con igual título
             val fileName = "user_tab_${System.currentTimeMillis()}.gp3"
             val targetFile = File(context.filesDir, fileName)
 
-            // Copiamos la corriente binaria de bytes del archivo seleccionado al almacenamiento local
             context.contentResolver.openInputStream(fileUri)?.use { inputStream ->
                 FileOutputStream(targetFile).use { outputStream ->
                     inputStream.copyTo(outputStream)
                 }
             } ?: throw Exception("No se pudo abrir la partitura seleccionada")
 
-            // Generamos la nueva entidad reutilizando tu Song data class
             val localSong = Song(
                 id = UUID.randomUUID().toString(),
                 title = title,
                 artist = "Mis Canciones",
-                tabs = mapOf("Guitarra" to targetFile.absolutePath), // Guardamos la ruta absoluta del almacenamiento interno
+                tabs = mapOf("Guitarra" to targetFile.absolutePath),
                 createdAt = Date(),
                 isLocal = true
             )
@@ -84,5 +81,24 @@ class SongRepository @Inject constructor(
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    // 💾 LOCAL: Actualizar datos de una canción (Renombrar)
+    suspend fun updateLocalSong(song: Song): Unit = withContext(Dispatchers.IO) {
+        cancionDao.updateLocalSong(song)
+    }
+
+    // 💾 LOCAL: Eliminar metadatos en Room y borrar su archivo .gp3 asociado
+    suspend fun deleteLocalSong(song: Song): Unit = withContext(Dispatchers.IO) {
+        // 1. Buscamos la ruta del archivo físico que guardamos en el mapa 'tabs'
+        val filePath = song.tabs["Guitarra"]
+        if (filePath != null) {
+            val file = File(filePath)
+            if (file.exists()) {
+                file.delete() // Borra el archivo .gp3 del almacenamiento interno
+            }
+        }
+        // 2. Eliminamos el registro de la base de datos Room
+        cancionDao.deleteLocalSong(song)
     }
 }
