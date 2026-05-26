@@ -98,12 +98,51 @@
     });
 
     // ============================================================
+    // CALCULAR TICKS REALES DESDE MASTER BARS
+    // score.endTick no existe en AlphaTab 1.3.0, así que lo
+    // calculamos manualmente desde los masterBars del score.
+    // ============================================================
+    function computeTotalTicks(score) {
+        if (!score.masterBars || score.masterBars.length === 0) return 96000;
+
+        var bars = score.masterBars;
+        var lastBar = bars[bars.length - 1];
+
+        // Opción 1: si el último bar tiene .start, usarlo + duración del bar
+        if (typeof lastBar.start === 'number' && lastBar.start > 0) {
+            var num = lastBar.timeSignatureNumerator || 4;
+            var den = lastBar.timeSignatureDenominator || 4;
+            var barTicks = num * (960 * 4 / den);
+            var total = lastBar.start + barTicks;
+            debug('totalTicks via lastBar.start: ' + total + ' (bars=' + bars.length + ')');
+            return total;
+        }
+
+        // Opción 2: sumar la duración en ticks de cada bar
+        var total = 0;
+        for (var i = 0; i < bars.length; i++) {
+            var num = bars[i].timeSignatureNumerator || 4;
+            var den = bars[i].timeSignatureDenominator || 4;
+            total += num * (960 * 4 / den);
+        }
+        debug('totalTicks via suma: ' + total + ' (bars=' + bars.length + ')');
+        return total;
+    }
+
+    // ============================================================
     // SCORE CARGADO
     // ============================================================
     api.scoreLoaded.on(function(s) {
-        totalTicks = s.endTick || 96000;
+        // Intentar endTick nativo, si no existe → calcular
+        if (s.endTick && s.endTick > 0) {
+            totalTicks = s.endTick;
+            debug('totalTicks via endTick: ' + totalTicks);
+        } else {
+            totalTicks = computeTotalTicks(s);
+        }
+
         var dur = s.duration || 60;
-        debug('Score: ticks=' + totalTicks + ' dur=' + dur + 's');
+        debug('Score: ticks=' + totalTicks + ' dur=' + dur + 's bars=' + (s.masterBars ? s.masterBars.length : '?'));
         if (!hasExternalDuration) {
             VIDEO_TOTAL_DURATION = dur;
             debug('Usando duracion del score: ' + VIDEO_TOTAL_DURATION + 's');
