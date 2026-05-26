@@ -43,6 +43,7 @@ fun PlayerScreen(
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val currentTime by viewModel.currentTime.collectAsStateWithLifecycle()
     val isMuted by viewModel.isMuted.collectAsStateWithLifecycle()
+    val syncOffset by viewModel.syncOffset.collectAsStateWithLifecycle()
 
     // Controla si la BottomBar está desplegada
     var isBottomBarExpanded by rememberSaveable { mutableStateOf(false) }
@@ -70,7 +71,7 @@ fun PlayerScreen(
                 withFrameMillis {
                     val now = System.nanoTime()
                     val elapsed = (now - systemTimeAtLastUpdate) / 1_000_000_000f
-                    val extrapolatedTime = lastYoutubeTime + elapsed
+                    val extrapolatedTime = lastYoutubeTime + elapsed + syncOffset
                     partituraWebViewRef.value?.evaluateJavascript("correctAutoScrollTime($extrapolatedTime);", null)
                 }
             }
@@ -118,7 +119,7 @@ fun PlayerScreen(
                         modifier = Modifier.fillMaxSize(),
                         onWebViewCreated = { webView ->
                             partituraWebViewRef.value = webView
-                            if (isPlaying) webView.startAutoScroll(currentTime)
+                            if (isPlaying) webView.startAutoScroll(currentTime + syncOffset)
                         }
                     )
                 }
@@ -205,7 +206,7 @@ fun PlayerScreen(
                                 onClick = {
                                     viewModel.togglePlay()
                                     if (isPlaying) partituraWebViewRef.value?.stopAutoScroll()
-                                    else partituraWebViewRef.value?.startAutoScroll(currentTime)
+                                    else partituraWebViewRef.value?.startAutoScroll(currentTime + syncOffset)
                                 },
                                 modifier = Modifier.size(if (isLandscape) 48.dp else 50.dp)
                             ) {
@@ -214,6 +215,30 @@ fun PlayerScreen(
                                     "Play/Pausa",
                                     Modifier.size(24.dp)
                                 )
+                            }
+                        }
+
+                        // Offset Sync Controls (Sincronización manual)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Sincronizar", style = MaterialTheme.typography.labelSmall)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                FilledTonalIconButton(
+                                    onClick = { viewModel.adjustSyncOffset(-0.5f) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Text("-", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                                }
+                                Text(
+                                    text = "${if (syncOffset > 0) "+" else ""}${String.format("%.1f", syncOffset)}s",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                )
+                                FilledTonalIconButton(
+                                    onClick = { viewModel.adjustSyncOffset(0.5f) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Text("+", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
@@ -231,7 +256,7 @@ fun PlayerScreen(
                 isMuted = isMuted,
                 onTimeUpdate = { seconds ->
                     viewModel.updateCurrentTime(seconds)
-                    partituraWebViewRef.value?.correctAutoScrollTime(seconds)
+                    partituraWebViewRef.value?.correctAutoScrollTime(seconds + syncOffset)
                 },
                 onDurationUpdate = { duration ->
                     videoDuration = duration

@@ -39,6 +39,10 @@ class PlayerViewModel @Inject constructor(
     private val _isMuted = MutableStateFlow(false)
     val isMuted: StateFlow<Boolean> = _isMuted.asStateFlow()
 
+    /** Offset manual de sincronización en segundos para ajustar el cursor con el vídeo. */
+    private val _syncOffset = MutableStateFlow(0f)
+    val syncOffset: StateFlow<Float> = _syncOffset.asStateFlow()
+
     /**
      * Carga una canción y reinicia todo el estado de reproducción.
      * Selecciona el primer instrumento disponible en las tablaturas de la canción.
@@ -48,6 +52,7 @@ class PlayerViewModel @Inject constructor(
         _isPlaying.value = false
         _currentTime.value = 0f
         _isMuted.value = false
+        _syncOffset.value = 0f // Resetear el offset al cambiar de canción
         _selectedInstrument.value = song.tabs.keys.firstOrNull() ?: "guitar"
     }
 
@@ -82,6 +87,11 @@ class PlayerViewModel @Inject constructor(
     /** Salta a un segundo específico del vídeo (seek). */
     fun seekTo(seconds: Float) {
         _currentTime.value = seconds
+    }
+
+    /** Ajusta el offset de sincronización en la cantidad de segundos indicada (+/-). */
+    fun adjustSyncOffset(deltaSeconds: Float) {
+        _syncOffset.value += deltaSeconds
     }
 
     /**

@@ -297,13 +297,15 @@
      * SIN api.play() → sin reloj interno → sin conflictos.
      */
     function correctAutoScrollTime(seconds) {
-        if (!isPlayerReady || totalTicks <= 0 || VIDEO_TOTAL_DURATION <= 0) return;
+        if (!isPlayerReady) return;
 
-        var progress = Math.max(0, Math.min(1, seconds / VIDEO_TOTAL_DURATION));
-        var tick = Math.round(progress * totalTicks);
-        api.tickPosition = tick;
+        // Usamos el motor de tiempo interno de AlphaTab (en milisegundos).
+        // Esto respeta perfectamente los cambios de BPM y métrica de la partitura
+        // en lugar de hacer una interpolación lineal inexacta.
+        var timeMs = Math.max(0, seconds * 1000);
+        api.timePosition = timeMs;
 
-        // Scroll manual (AlphaTab no scrollea sin play())
+        // Scroll manual (AlphaTab no scrollea automáticamente sin llamar a play())
         scrollToCursorIfNeeded();
     }
 
