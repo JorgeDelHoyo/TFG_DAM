@@ -11,12 +11,24 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.example.tfgv01.data.model.Song
 import com.example.tfgv01.ui.screens.LibraryScreen
 import com.example.tfgv01.ui.screens.PlayerScreen
-import com.example.tfgv01.ui.screens.LocalPlayerScreen // ✅ IMPORTAMOS LA PANTALLA REAL
+import com.example.tfgv01.ui.screens.LocalPlayerScreen
 import com.example.tfgv01.ui.theme.ArpegioTheme
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
+/**
+ * Activity principal y único punto de entrada de la aplicación Arpeg.io.
+ *
+ * Implementa navegación manual basada en estado (sin Navigation Component) con
+ * tres pantallas posibles:
+ * - **"library"**: Pantalla de biblioteca con canciones remotas y locales.
+ * - **"player"**: Reproductor con YouTube + partitura sincronizada (canciones de Firestore).
+ * - **"local_player"**: Reproductor con metrónomo virtual + partitura local (archivos .gp3).
+ *
+ * Anotada con @AndroidEntryPoint para habilitar la inyección de dependencias de Hilt
+ * en los ViewModels de cada pantalla.
+ */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,11 +44,12 @@ class MainActivity : ComponentActivity() {
                     "library" -> LibraryScreen(
                         onSongSelected = { song ->
                             selectedSong = song
+                            // El flag isLocal determina qué reproductor usar
                             currentScreen = if (song.isLocal) "local_player" else "player"
                         }
                     )
 
-                    // 🌐 Flujo Firebase (Comunidad)
+                    // Flujo Firebase: reproductor con vídeo YouTube sincronizado
                     "player" -> selectedSong?.let { song ->
                         PlayerScreen(
                             song = song,
@@ -44,9 +57,8 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // 🆕 Flujo Local (Canciones Propias subidas por el usuario)
+                    // Flujo local: reproductor con metrónomo virtual y control de tempo
                     "local_player" -> selectedSong?.let { song ->
-                        // ✅ Ahora llamará a la pantalla del archivo físico con Hilt y WebView
                         LocalPlayerScreen(
                             song = song,
                             onNavigateBack = { currentScreen = "library" }
@@ -58,7 +70,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// 🎨 Preview básico para desarrollo
 @Preview(showBackground = true)
 @Composable
 private fun MainActivityPreview() {
