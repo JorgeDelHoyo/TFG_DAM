@@ -14,27 +14,45 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewAssetLoader
 import java.io.File
 
+/**
+ * Componente Compose que renderiza una partitura interactiva dentro de un WebView.
+ *
+ * Utiliza la librería AlphaTab (cargada en player.html) para convertir archivos de tablatura
+ * Guitar Pro (.gp3/.gp4/.gp5/.gpx) en notación musical visual con cursor animado.
+ *
+ * Soporta dos modos de carga de archivos:
+ * - **Remoto (esLocal=false):** Archivos desde /assets/ (empaquetados con la APK o descargados).
+ * - **Local (esLocal=true):** Archivos desde filesDir (importados por el usuario).
+ *
+ * La comunicación Android ↔ JavaScript se realiza mediante [WebView.evaluateJavascript].
+ *
+ * @param urlArchivo Ruta del archivo de tablatura (nombre de asset o ruta absoluta).
+ * @param instrumentIndex Índice del track/instrumento a renderizar en AlphaTab.
+ * @param videoDuration Duración total de referencia en segundos (del vídeo YouTube o del score).
+ * @param esLocal Si true, el archivo se carga desde el almacenamiento interno del dispositivo.
+ * @param modifier Modifier de Compose estándar para layout.
+ * @param onWebViewCreated Callback que expone la instancia de WebView al composable padre.
+ */
 @Composable
 fun PartituraWebView(
     urlArchivo: String,
     instrumentIndex: Int,
     videoDuration: Float,
-    esLocal: Boolean = false, // 🆕 Flag crítico para saber el origen de la canción
+    esLocal: Boolean = false,
     modifier: Modifier = Modifier,
     onWebViewCreated: (WebView) -> Unit = {}
 ) {
     val safeInstrumentIndex = instrumentIndex.coerceAtLeast(0)
 
-    // Formateamos la ruta dependiendo de si es un archivo local del almacenamiento o un asset estático
+    // Construimos la URL según el origen del archivo
     val safeUrlArchivo = remember(urlArchivo, esLocal) {
         val trimmed = urlArchivo.trim()
         if (esLocal) {
-            // Extraemos solo el nombre físico del archivo (ej: user_tab_12345.gp3) de la ruta completa
+            // Para archivos locales: mapear la ruta física al path virtual de WebViewAssetLoader
             val nombreArchivo = File(trimmed).name
-            // Le indicamos al JavaScript que acceda mediante el nuevo manejador virtual seguro
             "https://appassets.androidplatform.net/local_files/$nombreArchivo"
         } else {
-            // Flujo original intacto para Firebase/Assets
+            // Para assets empaquetados: limpiar prefijos redundantes
             trimmed
                 .removePrefix("file:///android_asset/")
                 .removePrefix("android_asset/")
@@ -43,18 +61,16 @@ fun PartituraWebView(
         }
     }
 
-    Log.d("PARTITURA", "Cargando archivo (Modo Local=$esLocal): $safeUrlArchivo, índice: $safeInstrumentIndex")
+    Log.d("PARTITURA", "Cargando (local=$esLocal): $safeUrlArchivo, track: $safeInstrumentIndex")
 
     var webView: WebView? by remember { mutableStateOf(null) }
 
     AndroidView(
         factory = { context ->
-            // 🆕 Creamos un AssetLoader con DOBLE manejador de rutas: Assets + Internal Storage
+            // WebViewAssetLoader con doble path handler para resolver peticiones de ambos orígenes
             val assetLoader = WebViewAssetLoader.Builder()
                 .setDomain("appassets.androidplatform.net")
-                // Manejador 1: Para player.html y partituras de la comunidad (Firebase)
                 .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))
-                // Manejador 2: Para abrir partituras .gp3 dinámicas subidas por el usuario en filesDir
                 .addPathHandler("/local_files/", WebViewAssetLoader.InternalStoragePathHandler(context, context.filesDir))
                 .build()
 
@@ -70,6 +86,7 @@ fun PartituraWebView(
                     mediaPlaybackRequiresUserGesture = false
                 }
 
+                // Redirigir logs JS de la consola del WebView a Logcat
                 webChromeClient = object : WebChromeClient() {
                     override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
                         Log.d(
@@ -81,27 +98,27 @@ fun PartituraWebView(
                 }
 
                 webViewClient = object : WebViewClient() {
+                    // Interceptar peticiones para que el AssetLoader resuelva rutas virtuales
                     override fun shouldInterceptRequest(
                         view: WebView?,
                         request: WebResourceRequest?
                     ): WebResourceResponse? {
-                        // El interceptor ahora resolverá tanto las peticiones de /assets/ como las de /local_files/
                         return request?.url?.let { assetLoader.shouldInterceptRequest(it) }
                             ?: super.shouldInterceptRequest(view, request)
                     }
 
+                    // Una vez cargado player.html, inicializar AlphaTab con la canción
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
-                        Log.d("PARTITURA", "WebView cargada, cargando canción: $safeUrlArchivo con duración: $videoDuration")
+                        Log.d("PARTITURA", "player.html cargado. Invocando loadSong('$safeUrlArchivo', $safeInstrumentIndex, $videoDuration)")
 
-                        // Enviamos la URL construida al motor JS de player.html
                         view?.evaluateJavascript("loadSong('$safeUrlArchivo', $safeInstrumentIndex, $videoDuration)") { result ->
-                            Log.d("PARTITURA", "loadSong ejecutado: $result")
+                            Log.d("PARTITURA", "loadSong → $result")
                         }
                     }
                 }
 
-                // Cargar player.html vía HTTPS (Mantiene tu misma infraestructura)
+                // Cargar player.html a través del protocolo HTTPS virtual (requerido por CORS/AlphaTab)
                 loadUrl("https://appassets.androidplatform.net/assets/player.html")
 
                 webView = this
@@ -110,8 +127,7 @@ fun PartituraWebView(
         },
         modifier = modifier,
         update = { view ->
-            Log.d("PARTITURA", "Update WebView - Nuevo índice: $safeInstrumentIndex, Duración: $videoDuration")
-
+            // Actualizar el track e instrumento cuando cambian los parámetros de Compose
             view.evaluateJavascript(
                 "if (typeof window.changeTrack === 'function') { " +
                         "   changeTrack($safeInstrumentIndex); " +
@@ -119,7 +135,7 @@ fun PartituraWebView(
                         "   console.warn('[Android] changeTrack no definido aún'); " +
                         "}"
             ) { result ->
-                Log.d("PARTITURA", "changeTrack en update: $result")
+                Log.d("PARTITURA", "changeTrack → $result")
             }
 
             view.evaluateJavascript(
@@ -127,33 +143,40 @@ fun PartituraWebView(
                         "   setVideoDuration($videoDuration); " +
                         "}"
             ) { result ->
-                Log.d("PARTITURA", "setVideoDuration en update: $result")
+                Log.d("PARTITURA", "setVideoDuration → $result")
             }
         }
     )
 }
 
-// 🔥 Tus funciones de extensión para controlar el scroll se quedan 100% intactas
+// ============================================================
+// Funciones de extensión para control del cursor desde Kotlin
+// ============================================================
+
+/** Inicia el avance del cursor desde un segundo dado. */
 fun WebView.startAutoScroll(startTime: Float = 0f) {
     this.evaluateJavascript("startAutoScroll($startTime)") { result ->
         Log.d("PARTITURA", "Auto-scroll iniciado: $result")
     }
 }
 
+/** Detiene el avance del cursor. */
 fun WebView.stopAutoScroll() {
     this.evaluateJavascript("stopAutoScroll()") { result ->
         Log.d("PARTITURA", "Auto-scroll detenido: $result")
     }
 }
 
+/** Actualiza la posición del cursor al segundo indicado. */
 fun WebView.updateScrollPosition(time: Float) {
     this.evaluateJavascript("updateScrollPosition($time)") { result ->
-        Log.d("PARTITURA", "Posición de scroll actualizada: $result")
+        Log.d("PARTITURA", "Posición actualizada: $result")
     }
 }
 
+/** Corrige la posición del cursor en base al tiempo real del vídeo YouTube. */
 fun WebView.correctAutoScrollTime(time: Float) {
     this.evaluateJavascript("correctAutoScrollTime($time)") { result ->
-        Log.d("PARTITURA", "Tiempo de auto-scroll corregido: $result")
+        Log.d("PARTITURA", "Tiempo corregido: $result")
     }
 }

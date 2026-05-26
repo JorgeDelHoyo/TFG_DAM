@@ -10,6 +10,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
+/**
+ * ViewModel para la pantalla de reproductor principal (canciones de Firebase + YouTube).
+ *
+ * Gestiona el estado de reproducción del vídeo de YouTube sincronizado con la partitura.
+ * El [SavedStateHandle] permite restaurar estado tras la destrucción del proceso.
+ *
+ * @property savedStateHandle handle inyectado por Hilt para persistir estado ante config changes.
+ */
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle
@@ -27,41 +35,61 @@ class PlayerViewModel @Inject constructor(
     private val _currentTime = MutableStateFlow(0f)
     val currentTime: StateFlow<Float> = _currentTime.asStateFlow()
 
-    // 🔊 Estado de silenciador del video (Mute)
+    /** Estado de silenciamiento del audio del vídeo de YouTube. */
     private val _isMuted = MutableStateFlow(false)
     val isMuted: StateFlow<Boolean> = _isMuted.asStateFlow()
 
+    /**
+     * Carga una canción y reinicia todo el estado de reproducción.
+     * Selecciona el primer instrumento disponible en las tablaturas de la canción.
+     */
     fun loadSong(song: Song) {
         _song.value = song
         _isPlaying.value = false
         _currentTime.value = 0f
-        _isMuted.value = false // Resetear audio al cambiar de canción
+        _isMuted.value = false
         _selectedInstrument.value = song.tabs.keys.firstOrNull() ?: "guitar"
     }
 
+    /**
+     * Cambia el instrumento/pista seleccionado, si la canción tiene tablatura para él.
+     * Provoca un re-render de la partitura en el WebView.
+     */
     fun selectInstrument(instrument: String) {
         if (_song.value?.hasTabFor(instrument) == true) {
             _selectedInstrument.value = instrument
         }
     }
 
+    /** Alterna entre play y pausa del vídeo de YouTube. */
     fun togglePlay() {
         _isPlaying.value = !_isPlaying.value
     }
 
-    // 🔊 Alternar entre muteado y desmuteado
+    /** Alterna entre muteado y desmuteado del audio. */
     fun toggleMute() {
         _isMuted.value = !_isMuted.value
     }
 
+    /**
+     * Actualiza el tiempo actual de reproducción del vídeo.
+     * Llamado desde el bridge de JavaScript del reproductor de YouTube (~2 veces/seg).
+     */
     fun updateCurrentTime(seconds: Float) {
         _currentTime.value = seconds
     }
 
+    /** Salta a un segundo específico del vídeo (seek). */
     fun seekTo(seconds: Float) {
         _currentTime.value = seconds
     }
 
+    /**
+     * Obtiene la ruta del asset de tablatura para el instrumento seleccionado,
+     * limpiando prefijos innecesarios que podrían venir de Firebase.
+     *
+     * @return Ruta relativa del archivo .gp3 dentro de /assets/, o null si no hay tab.
+     */
     fun getTabAssetPath(): String? {
         val song = _song.value ?: return null
         val instrument = _selectedInstrument.value

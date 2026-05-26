@@ -3,6 +3,7 @@ package com.example.tfgv01.data.repository
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import com.example.tfgv01.data.local.CancionDao
 import com.example.tfgv01.data.model.Song
 import com.google.firebase.firestore.FirebaseFirestore
@@ -20,20 +21,46 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Repositorio central de canciones. Implementa el patrón Repository para abstraer
+ * las dos fuentes de datos de la aplicación:
+ *
+ * 1. **Firestore (remoto):** Canciones de la comunidad con vídeo de YouTube + tablatura.
+ * 2. **Room (local):** Archivos .gp3 importados por el usuario desde su dispositivo.
+ *
+ * Inyectado como @Singleton para compartir una única instancia en toda la app.
+ *
+ * @property firestore Instancia de Firestore inyectada por Hilt.
+ * @property cancionDao DAO de Room para operaciones CRUD locales.
+ * @property context Contexto de la aplicación para acceder a filesDir.
+ */
 @Singleton
 class SongRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val cancionDao: CancionDao,
     @ApplicationContext private val context: Context
 ) {
-    private val collection = firestore.collection("canciones")
+    companion object {
+        private const val TAG = "SongRepository"
+        private const val COLLECTION_NAME = "canciones"
+    }
 
-    // 🌐 Obtener canciones desde Firestore (Comunidad)
+    private val collection = firestore.collection(COLLECTION_NAME)
+
+    /**
+     * Obtiene las canciones de la comunidad desde Firestore en tiempo real.
+     *
+     * Usa [callbackFlow] + addSnapshotListener para emitir actualizaciones reactivas.
+     * Las canciones se ordenan por fecha de creación descendente (más recientes primero).
+     *
+     * @return Flow que emite la lista actualizada cada vez que Firestore detecta cambios.
+     */
     fun getSongs(): Flow<List<Song>> = callbackFlow {
         val listener = collection
             .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
+                    Log.e(TAG, "Error al escuchar Firestore", error)
                     close(error)
                     return@addSnapshotListener
                 }
@@ -43,6 +70,12 @@ class SongRepository @Inject constructor(
         awaitClose { listener.remove() }
     }
 
+    /**
+     * Busca una canción específica por su ID en Firestore.
+     *
+     * @param songId Identificador del documento en la colección "canciones".
+     * @return Result con la canción encontrada o un error descriptivo.
+     */
     suspend fun getSongById(songId: String): Result<Song> = try {
         val document = collection.document(songId).get().await()
         val song = document.toObject(Song::class.java)
@@ -52,10 +85,24 @@ class SongRepository @Inject constructor(
         Result.failure(e)
     }
 
-    // 💾 LOCAL: Obtener canciones de Room
+    /**
+     * Obtiene las canciones locales almacenadas en Room.
+     * @return Flow reactivo que se actualiza automáticamente al insertar/eliminar canciones.
+     */
     fun getLocalSongs(): Flow<List<Song>> = cancionDao.getLocalSongs()
 
-    // 💾 LOCAL: Guardar archivo .gp3 físico e insertar metadatos en Room
+    /**
+     * Importa un archivo .gp3 desde el sistema de archivos del dispositivo.
+     *
+     * Proceso:
+     * 1. Copia el archivo desde la URI seleccionada al almacenamiento interno (filesDir).
+     * 2. Genera un nombre único para evitar colisiones (user_tab_timestamp.gp3).
+     * 3. Inserta los metadatos en Room con isLocal=true.
+     *
+     * @param title Título asignado por el usuario a la canción.
+     * @param fileUri URI del archivo seleccionado por el file picker.
+     * @return Result.success si todo OK, Result.failure con el error si falla.
+     */
     suspend fun saveLocalSong(title: String, fileUri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val fileName = "user_tab_${System.currentTimeMillis()}.gp3"
@@ -77,28 +124,32 @@ class SongRepository @Inject constructor(
             )
 
             cancionDao.insertLocalSong(localSong)
+            Log.d(TAG, "Canción local guardada: '$title' → ${targetFile.absolutePath}")
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e(TAG, "Error al importar canción local", e)
             Result.failure(e)
         }
     }
 
-    // 💾 LOCAL: Actualizar datos de una canción (Renombrar)
+    /** Actualiza los metadatos de una canción local en Room (ej: renombrar título). */
     suspend fun updateLocalSong(song: Song): Unit = withContext(Dispatchers.IO) {
         cancionDao.updateLocalSong(song)
     }
 
-    // 💾 LOCAL: Eliminar metadatos en Room y borrar su archivo .gp3 asociado
+    /**
+     * Elimina una canción local: borra el archivo .gp3 del almacenamiento
+     * interno y elimina el registro de la base de datos Room.
+     */
     suspend fun deleteLocalSong(song: Song): Unit = withContext(Dispatchers.IO) {
-        // 1. Buscamos la ruta del archivo físico que guardamos en el mapa 'tabs'
         val filePath = song.tabs["Guitarra"]
         if (filePath != null) {
             val file = File(filePath)
             if (file.exists()) {
-                file.delete() // Borra el archivo .gp3 del almacenamiento interno
+                file.delete()
+                Log.d(TAG, "Archivo eliminado: $filePath")
             }
         }
-        // 2. Eliminamos el registro de la base de datos Room
         cancionDao.deleteLocalSong(song)
     }
 }
