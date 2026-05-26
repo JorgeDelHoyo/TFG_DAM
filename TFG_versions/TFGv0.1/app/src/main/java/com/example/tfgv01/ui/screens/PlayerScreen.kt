@@ -28,6 +28,7 @@ import com.example.tfgv01.data.model.Song
 import com.example.tfgv01.ui.components.*
 import com.example.tfgv01.ui.viewmodel.PlayerViewModel
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.text.font.FontWeight
 
 @Composable
 fun PlayerScreen(
@@ -127,18 +128,19 @@ fun PlayerScreen(
         }
 
         // 🔹 3. BOTTOM BAR DESPLEGABLE Y RESPONSIVA
-        val targetHeight = if (isBottomBarExpanded) (if (isLandscape) 80.dp else 110.dp) else 48.dp
-        val barHeight by animateDpAsState(targetValue = targetHeight)
-
         Surface(
+            color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(barHeight),
-            tonalElevation = 8.dp,
-            shadowElevation = 12.dp,
-            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                .wrapContentHeight()
+                .animateContentSize(),
+            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+            shadowElevation = 8.dp
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .padding(top = 4.dp, bottom = if (isLandscape) 4.dp else 8.dp)
+            ) {
 
                 // Tirador (Siempre visible)
                 Row(
