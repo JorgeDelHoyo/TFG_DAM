@@ -53,8 +53,6 @@ class LocalPlayerViewModel @Inject constructor() : ViewModel() {
     private val _uiState = MutableStateFlow(LocalPlayerUiState())
     val uiState: StateFlow<LocalPlayerUiState> = _uiState.asStateFlow()
 
-    private var metronomeJob: Job? = null
-
     /**
      * Inicializa el ViewModel con los datos de la canción seleccionada.
      * Extrae los instrumentos disponibles del mapa de tablaturas.
@@ -74,46 +72,10 @@ class LocalPlayerViewModel @Inject constructor() : ViewModel() {
     }
 
     /**
-     * Alterna entre reproducción y pausa del metrónomo virtual.
-     * Al iniciar, lanza una corrutina que avanza el tiempo cada [TIME_STEP_MS] ms.
+     * Alterna entre reproducción y pausa del reproductor nativo de AlphaTab.
      */
     fun togglePlayPause() {
-        val nextPlayingState = !_uiState.value.isPlaying
-        _uiState.value = _uiState.value.copy(isPlaying = nextPlayingState)
-
-        if (nextPlayingState) {
-            startMetronomeTicker()
-        } else {
-            stopMetronomeTicker()
-        }
-    }
-
-    /**
-     * Inicia el ticker del metrónomo en una corrutina.
-     * Avanza el tiempo proporcionalmente al multiplicador de tempo.
-     * Al llegar al final de la partitura, reinicia desde el principio (loop).
-     */
-    private fun startMetronomeTicker() {
-        metronomeJob?.cancel()
-        metronomeJob = viewModelScope.launch {
-            while (true) {
-                delay(TIME_STEP_MS)
-                val currentState = _uiState.value
-                val secondsPassed = (TIME_STEP_MS / 1000f) * currentState.currentTempoMultiplier
-                var newTime = currentState.currentTimeSeconds + secondsPassed
-
-                if (newTime >= currentState.totalDurationSeconds) {
-                    newTime = 0f
-                }
-
-                _uiState.value = currentState.copy(currentTimeSeconds = newTime)
-            }
-        }
-    }
-
-    private fun stopMetronomeTicker() {
-        metronomeJob?.cancel()
-        metronomeJob = null
+        _uiState.value = _uiState.value.copy(isPlaying = !_uiState.value.isPlaying)
     }
 
     /**
@@ -152,6 +114,5 @@ class LocalPlayerViewModel @Inject constructor() : ViewModel() {
 
     override fun onCleared() {
         super.onCleared()
-        stopMetronomeTicker()
     }
 }

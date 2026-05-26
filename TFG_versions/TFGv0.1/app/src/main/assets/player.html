@@ -327,6 +327,28 @@
         }
     }
 
+    // ============================================================
+    // REPRODUCCIÓN NATIVA (Para Canciones Locales)
+    // ============================================================
+
+    function playNative() {
+        if (api && isPlayerReady) {
+            api.play();
+        }
+    }
+
+    function pauseNative() {
+        if (api && isPlayerReady) {
+            api.pause();
+        }
+    }
+
+    function setPlaybackSpeed(speed) {
+        if (api && isPlayerReady) {
+            api.playbackSpeed = Number(speed);
+        }
+    }
+
     function isReady() { return isPlayerReady; }
 </script>
 </body>

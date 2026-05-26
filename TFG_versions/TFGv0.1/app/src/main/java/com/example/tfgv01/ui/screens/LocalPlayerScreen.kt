@@ -69,13 +69,11 @@ fun LocalPlayerScreen(
 
     val partituraWebViewRef = remember { mutableStateOf<WebView?>(null) }
 
-    // 🎯 TRANSPONSOR DE TIEMPO SEGURO
-    LaunchedEffect(uiState.currentTimeSeconds) {
-        if (uiState.isPlaying) {
-            partituraWebViewRef.value?.evaluateJavascript(
-                "correctAutoScrollTime(${uiState.currentTimeSeconds});", null
-            )
-        }
+    // 🎯 ACTUALIZACIÓN DE VELOCIDAD NATIVA
+    LaunchedEffect(uiState.currentTempoMultiplier) {
+        partituraWebViewRef.value?.evaluateJavascript(
+            "setPlaybackSpeed(${uiState.currentTempoMultiplier});", null
+        )
     }
 
     Column(
@@ -236,7 +234,7 @@ fun LocalPlayerScreen(
 
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = "⏱️ ${String.format("%.1f", uiState.currentTimeSeconds)}s / ${uiState.totalDurationSeconds.toInt()}s",
+                                    text = "Reproductor Nativo",
                                     style = MaterialTheme.typography.labelMedium
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
@@ -244,9 +242,9 @@ fun LocalPlayerScreen(
                                     onClick = {
                                         viewModel.togglePlayPause()
                                         if (uiState.isPlaying) {
-                                            partituraWebViewRef.value?.evaluateJavascript("stopAutoScroll();", null)
+                                            partituraWebViewRef.value?.evaluateJavascript("pauseNative();", null)
                                         } else {
-                                            partituraWebViewRef.value?.evaluateJavascript("startAutoScroll(${uiState.currentTimeSeconds});", null)
+                                            partituraWebViewRef.value?.evaluateJavascript("playNative();", null)
                                         }
                                     },
                                     modifier = Modifier.size(50.dp)
