@@ -10,29 +10,39 @@
 
         .at-container {
             height: 100vh;
-            overflow-y: scroll !important;
+            overflow-y: auto !important;
             overflow-x: hidden !important;
             position: relative;
             background-color: #ffffff !important;
             -webkit-overflow-scrolling: touch;
         }
-        #alphaTab { width: 100% !important; background: #ffffff; position: relative; padding-bottom: 500px; }
 
-        #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; display: none; z-index: 10; background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 8px; }
+        #alphaTab {
+            width: 100% !important;
+            background: #ffffff;
+            position: relative;
+            padding-bottom: 300px;
+        }
 
-        /* Ocultar cursores nativos de AlphaTab */
-        .at-cursor-beat, .at-selection, .at-cursor { display: none !important; }
+        #loading {
+            position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff; font-size: 18px; display: none; z-index: 10;
+            background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 8px;
+        }
 
-        /* Cursor maestro propio */
-        #master-cursor {
-            position: absolute;
-            background-color: rgba(255, 0, 0, 0.22) !important;
-            border-left: 3px solid #ff0000 !important;
-            z-index: 2500 !important;
-            pointer-events: none;
-            display: none;
-            box-sizing: border-box;
-            transition: left 0.15s linear;
+        /* ============================================
+           CURSOR NATIVO DE ALPHATAB — estilo GProTab
+           ============================================ */
+        .at-cursor-bar {
+            background: rgba(255, 242, 0, 0.12) !important;
+        }
+        .at-cursor-beat {
+            background: rgba(220, 0, 0, 0.75) !important;
+            width: 3px !important;
+        }
+        .at-selection div {
+            background: rgba(64, 64, 255, 0.1) !important;
         }
     </style>
 </head>
@@ -40,250 +50,183 @@
 
 <div class="at-container" id="scroll-container">
     <div id="alphaTab"></div>
-    <div id="master-cursor"></div>
 </div>
 <div id="loading">Cargando partitura...</div>
 
 <script>
-    var api = null, isInitialized = false, pendingTrackIndex = 0;
-    var totalDuration = 60, totalTicks = 96000;
+    var api = null;
+    var totalTicks = 96000;
     var VIDEO_TOTAL_DURATION = 180;
     var hasExternalDuration = false;
-
-    var ultimoRenglonY = -1;
-    var masterCursorEl = null;
-    var cajasCompases = [];
+    var isPlayerReady = false;
+    var pendingTrackIndex = 0;
+    var pendingStartTime = -1;
     var resizeTimer = null;
-    var userScrolling = false;
-    var userScrollTimer = null;
 
-    function debug(m) { console.log('[JS]', m); }
+    function debug(m) { console.log('[ARPEGIO]', m); }
 
     // ============================================================
-    // INICIALIZACIÓN DE ALPHATAB (mismo config que el original)
+    // ALPHATAB CON REPRODUCTOR Y CURSOR NATIVOS
     // ============================================================
+    var scrollEl = document.getElementById('scroll-container');
+
     api = new alphaTab.AlphaTabApi(document.getElementById('alphaTab'), {
-        player: { enablePlayer: false, enableCursor: false },
-        core: { fileReadUrl: 'https://appassets.androidplatform.net/assets/', includeNoteBounds: true },
+        player: {
+            enablePlayer: true,
+            enableCursor: true,
+            scrollElement: scrollEl,
+            soundFont: 'https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.3.0/dist/soundfont/sonivox.sf2'
+        },
+        core: {
+            fileReadUrl: 'https://appassets.androidplatform.net/assets/',
+            includeNoteBounds: true
+        },
         display: { layout: 'page', scrollMode: 'off' }
     });
 
     // ============================================================
-    // EVENTOS
+    // SCORE CARGADO
     // ============================================================
-    if (api.scoreLoaded && api.scoreLoaded.on) {
-        api.scoreLoaded.on(function(s) {
-            totalDuration = s.duration || 60;
-            totalTicks = s.endTick || 96000;
-            debug('Score cargado. Dur=' + totalDuration + 's, Ticks=' + totalTicks);
-            if (!hasExternalDuration) {
-                VIDEO_TOTAL_DURATION = totalDuration;
-            }
-        });
-    }
-
-    if (api.renderFinished && api.renderFinished.on) {
-        api.renderFinished.on(function() {
-            document.getElementById('loading').style.display = 'none';
-            masterCursorEl = document.getElementById('master-cursor');
-            debug('Render OK. Mapeando compases...');
-            setTimeout(function() { mapearCompasesDesdeGeometria(); }, 500);
-        });
-    }
+    api.scoreLoaded.on(function(s) {
+        totalTicks = s.endTick || 96000;
+        var dur = s.duration || 60;
+        debug('Score: ticks=' + totalTicks + ' dur=' + dur + 's');
+        if (!hasExternalDuration) {
+            VIDEO_TOTAL_DURATION = dur;
+        }
+    });
 
     // ============================================================
-    // RE-RENDER AL ROTAR PANTALLA (debounce 300ms)
+    // RENDER TERMINADO
+    // ============================================================
+    api.renderFinished.on(function() {
+        document.getElementById('loading').style.display = 'none';
+        debug('Render OK');
+    });
+
+    // ============================================================
+    // REPRODUCTOR LISTO (SoundFont cargado)
+    // Ahora sí podemos mover el cursor con api.tickPosition
+    // ============================================================
+    api.playerReady.on(function() {
+        isPlayerReady = true;
+        api.masterVolume = 0;  // SIEMPRE mudo — YouTube da el audio
+        debug('Player LISTO. totalTicks=' + totalTicks + ' VIDEO_DUR=' + VIDEO_TOTAL_DURATION);
+
+        // Si había un startAutoScroll pendiente, ejecutarlo ahora
+        if (pendingStartTime >= 0) {
+            debug('Ejecutando start pendiente: ' + pendingStartTime + 's');
+            doStart(pendingStartTime);
+            pendingStartTime = -1;
+        }
+    });
+
+    // ============================================================
+    // RESIZE → re-render
     // ============================================================
     window.addEventListener('resize', function() {
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(function() {
             debug('Resize → re-render');
-            isInitialized = false;
-            ultimoRenglonY = -1;
-            if (masterCursorEl) masterCursorEl.style.display = 'none';
             api.render();
         }, 300);
     });
 
     // ============================================================
-    // DETECTAR SCROLL MANUAL DEL USUARIO
-    // Cuando el usuario hace scroll, desactivamos el auto-scroll
-    // temporalmente para que pueda mirar libremente.
+    // FUNCIONES INTERNAS
     // ============================================================
-    var container = document.getElementById('scroll-container');
-    container.addEventListener('touchstart', function() {
-        userScrolling = true;
-        clearTimeout(userScrollTimer);
-    });
-    container.addEventListener('touchend', function() {
-        clearTimeout(userScrollTimer);
-        userScrollTimer = setTimeout(function() { userScrolling = false; }, 4000);
-    });
 
-    // ============================================================
-    // MAPEAR COMPASES DESDE GEOMETRÍA (igual que el original, FUNCIONA)
-    // ============================================================
-    function mapearCompasesDesdeGeometria() {
-        cajasCompases = [];
-        ultimoRenglonY = -1;
-
-        if (!api.score || !api.score.masterBars) {
-            debug('Error: sin score.masterBars');
-            return;
-        }
-
-        try {
-            var lookup = api.boundsLookup || (api.renderer ? api.renderer.boundsLookup : null);
-            if (lookup && lookup.staffSystems) {
-                lookup.staffSystems.forEach(function(system) {
-                    if (system.bars) {
-                        system.bars.forEach(function(barBounds) {
-                            var trackIdx = -1;
-                            if (barBounds.bar) {
-                                if (barBounds.bar.track) {
-                                    trackIdx = barBounds.bar.track.index;
-                                } else if (typeof barBounds.bar.trackIndex !== 'undefined') {
-                                    trackIdx = barBounds.bar.trackIndex;
-                                }
-                            }
-                            if (trackIdx === pendingTrackIndex) {
-                                var bounds = barBounds.realBounds || barBounds.visualBounds;
-                                if (bounds && bounds.w > 0 && bounds.h > 0) {
-                                    cajasCompases.push({
-                                        index: barBounds.bar.index,
-                                        x: bounds.x,
-                                        y: bounds.y,
-                                        w: bounds.w,
-                                        h: bounds.h
-                                    });
-                                }
-                            }
-                        });
-                    }
-                });
+    /** Arranca el player mudo para que el cursor se active */
+    function doStart(resumeTime) {
+        api.masterVolume = 0;
+        api.play();
+        // Pequeño delay para que el player arranque, luego posicionar
+        setTimeout(function() {
+            if (resumeTime > 0) {
+                moveCursorToTime(resumeTime);
             }
-
-            cajasCompases.sort(function(a, b) { return a.index - b.index; });
-
-            if (cajasCompases.length > 0) {
-                isInitialized = true;
-                debug('Compases mapeados: ' + cajasCompases.length);
-            } else {
-                // Plan B: distribución uniforme
-                var numBars = Math.max(3, api.score.masterBars.length);
-                var totalH = document.getElementById('alphaTab').clientHeight || 600;
-                var altoIndividual = totalH / numBars;
-                for (var k = 0; k < numBars; k++) {
-                    cajasCompases.push({
-                        index: k,
-                        x: 0,
-                        y: k * altoIndividual,
-                        w: document.getElementById('alphaTab').clientWidth || 360,
-                        h: altoIndividual
-                    });
-                }
-                isInitialized = true;
-                debug('Modo fallback: ' + numBars + ' compases distribuidos');
-            }
-        } catch (e) {
-            debug('Error mapeando: ' + e.message);
-        }
+        }, 50);
     }
 
-    // ============================================================
-    // SINCRONIZAR CURSOR CON EL TIEMPO DEL VÍDEO
-    // MEJORA: scroll solo al cambiar de línea Y solo si el usuario
-    //         no está haciendo scroll manual
-    // ============================================================
-    function sincronizarConVideo(seconds) {
-        if (!isInitialized || cajasCompases.length === 0 || !masterCursorEl) return;
-
-        var duracionPorCompas = VIDEO_TOTAL_DURATION / cajasCompases.length;
-        var indexCompas = Math.floor(seconds / duracionPorCompas);
-        if (indexCompas >= cajasCompases.length) indexCompas = cajasCompases.length - 1;
-        if (indexCompas < 0) indexCompas = 0;
-
-        var compas = cajasCompases[indexCompas];
-
-        // Progreso dentro del compás actual (0.0 → 1.0)
-        var tiempoInicio = indexCompas * duracionPorCompas;
-        var progreso = (seconds - tiempoInicio) / duracionPorCompas;
-        if (progreso > 1) progreso = 1;
-        if (progreso < 0) progreso = 0;
-
-        var cursorX = compas.x + (progreso * compas.w);
-
-        masterCursorEl.style.display = 'block';
-
-        // ¿Cambio de línea/renglón?
-        if (compas.y !== ultimoRenglonY) {
-            // Salto de línea: quitar transición para que no se vea volar
-            masterCursorEl.style.transition = 'none';
-            masterCursorEl.style.left = cursorX + 'px';
-            masterCursorEl.style.top = (compas.y + 4) + 'px';
-            masterCursorEl.style.width = '24px';
-            masterCursorEl.style.height = (compas.h - 8) + 'px';
-
-            void masterCursorEl.offsetWidth; // Forzar reflow
-
-            masterCursorEl.style.transition = 'left 0.15s linear';
-            ultimoRenglonY = compas.y;
-
-            // MEJORA: Auto-scroll solo si el usuario NO está haciendo scroll manual
-            if (!userScrolling) {
-                var scrollContainer = document.getElementById('scroll-container');
-                var targetScroll = compas.y - (scrollContainer.clientHeight * 0.15);
-                if (targetScroll < 0) targetScroll = 0;
-                scrollContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
-            }
-        } else {
-            // Dentro de la misma línea: mover con transición suave
-            masterCursorEl.style.left = cursorX + 'px';
-            masterCursorEl.style.top = (compas.y + 4) + 'px';
-            masterCursorEl.style.width = '24px';
-            masterCursorEl.style.height = (compas.h - 8) + 'px';
-        }
+    /** Mueve el cursor nativo a un tiempo dado (segundos) */
+    function moveCursorToTime(seconds) {
+        if (!isPlayerReady || totalTicks <= 0 || VIDEO_TOTAL_DURATION <= 0) return;
+        var progress = seconds / VIDEO_TOTAL_DURATION;
+        if (progress < 0) progress = 0;
+        if (progress > 1) progress = 1;
+        var tick = Math.round(progress * totalTicks);
+        api.tickPosition = tick;
     }
 
     // ============================================================
     // API PÚBLICA — Llamadas desde Kotlin
     // ============================================================
-    function correctAutoScrollTime(time) { sincronizarConVideo(time); }
-    function updateScrollPosition(time) { sincronizarConVideo(time); }
-    function startAutoScroll(resumeTime) { sincronizarConVideo(resumeTime); }
-    function stopAutoScroll() {}
-
-    function setVideoDuration(duration) {
-        if (duration && Number(duration) > 0) {
-            VIDEO_TOTAL_DURATION = Number(duration);
-            hasExternalDuration = true;
-        }
-    }
 
     function loadSong(fileName, trackIndex, duration) {
         pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
+        pendingStartTime = -1;
+
         if (duration && Number(duration) > 0) {
             VIDEO_TOTAL_DURATION = Number(duration);
             hasExternalDuration = true;
         } else {
             hasExternalDuration = false;
         }
+
         document.getElementById('loading').style.display = 'block';
-        isInitialized = false;
-        if (masterCursorEl) masterCursorEl.style.display = 'none';
-        api.load(fileName.startsWith('http') ? fileName : 'https://appassets.androidplatform.net/assets/' + fileName.replace(/^\/+/, ''), [pendingTrackIndex]);
+        isPlayerReady = false;
+
+        var url = fileName.startsWith('http')
+            ? fileName
+            : 'https://appassets.androidplatform.net/assets/' + fileName.replace(/^\/+/, '');
+
+        debug('Cargando: ' + url + ' track=' + pendingTrackIndex + ' dur=' + VIDEO_TOTAL_DURATION);
+        api.load(url, [pendingTrackIndex]);
+    }
+
+    /** Kotlin llama esto cada frame (~60fps) con el tiempo del vídeo YouTube */
+    function correctAutoScrollTime(seconds) {
+        moveCursorToTime(seconds);
+    }
+
+    /** Cuando el usuario pulsa play: arrancar player mudo */
+    function startAutoScroll(resumeTime) {
+        var t = Number(resumeTime) || 0;
+        if (isPlayerReady) {
+            doStart(t);
+        } else {
+            // SoundFont aún cargando — encolar para cuando esté listo
+            pendingStartTime = t;
+            debug('Player no listo, encolando start para t=' + t);
+        }
+    }
+
+    /** Cuando el usuario pulsa pausa */
+    function stopAutoScroll() {
+        pendingStartTime = -1;
+        if (isPlayerReady) {
+            api.pause();
+        }
+    }
+
+    function updateScrollPosition(t) { correctAutoScrollTime(t); }
+
+    function setVideoDuration(duration) {
+        if (duration && Number(duration) > 0) {
+            VIDEO_TOTAL_DURATION = Number(duration);
+            hasExternalDuration = true;
+            debug('Duración externa: ' + VIDEO_TOTAL_DURATION + 's');
+        }
     }
 
     function changeTrack(trackIndex) {
         pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
-        if (api && api.score) {
-            isInitialized = false;
-            if (masterCursorEl) masterCursorEl.style.display = 'none';
+        if (api && api.score && api.score.tracks[pendingTrackIndex]) {
             api.renderTracks([api.score.tracks[pendingTrackIndex]]);
         }
     }
 
-    function isReady() { return isInitialized; }
+    function isReady() { return isPlayerReady; }
 </script>
 </body>
 </html>
