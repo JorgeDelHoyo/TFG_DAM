@@ -48,10 +48,8 @@ fun LocalPlayerScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    // 🎹 LÓGICA DE BPM: Fijamos un tempo original estándar para las partituras locales
-    val bpmOriginales = 120
-    // Calculamos los BPM actuales en base al multiplicador del estado
-    val bpmActuales = (bpmOriginales * uiState.currentTempoMultiplier).toInt()
+    // 🎹 LÓGICA DE BPM: Usamos el tempo real de la partitura
+    val bpmActuales = (uiState.originalBPM * uiState.currentTempoMultiplier).toInt()
 
     // Inicializar el ViewModel de forma segura
     LaunchedEffect(song) {
@@ -124,12 +122,21 @@ fun LocalPlayerScreen(
                         onWebViewCreated = { webView ->
                             partituraWebViewRef.value = webView
 
+                            // Leer la duración real y BPM calculados por AlphaTab
                             webView.postDelayed({
-                                webView.evaluateJavascript("if(typeof totalDuration !== 'undefined') totalDuration") { result ->
-                                    val duration = result?.toFloatOrNull() ?: 60f
-                                    viewModel.updateTotalDuration(duration)
+                                webView.evaluateJavascript("window.totalDuration") { result ->
+                                    val duration = result?.toFloatOrNull()
+                                    if (duration != null && duration > 0f) {
+                                        viewModel.updateTotalDuration(duration)
+                                    }
                                 }
-                            }, 1000)
+                                webView.evaluateJavascript("window.scoreBPM") { result ->
+                                    val bpm = result?.toIntOrNull()
+                                    if (bpm != null && bpm > 0) {
+                                        viewModel.updateOriginalBPM(bpm)
+                                    }
+                                }
+                            }, 2500) // Esperar a que el score se cargue completamente
                         }
                     )
                 }

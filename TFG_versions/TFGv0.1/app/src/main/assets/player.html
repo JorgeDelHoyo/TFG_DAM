@@ -130,6 +130,44 @@
     }
 
     // ============================================================
+    // CALCULAR DURACIÓN REAL EN SEGUNDOS DESDE TEMPOS
+    // Itera cada masterBar teniendo en cuenta los cambios de tempo
+    // (tempoAutomation) para convertir ticks → segundos reales.
+    // ============================================================
+    function computeRealDuration(score) {
+        if (!score.masterBars || score.masterBars.length === 0) return 180;
+
+        var bars = score.masterBars;
+        var currentBPM = 120; // fallback
+        var totalSeconds = 0;
+
+        // Buscar tempo inicial en score.tempo
+        if (score.tempo && score.tempo > 0) {
+            currentBPM = score.tempo;
+        }
+
+        for (var i = 0; i < bars.length; i++) {
+            var bar = bars[i];
+
+            // Detectar cambio de tempo en este compás
+            if (bar.tempoAutomation && bar.tempoAutomation.value > 0) {
+                currentBPM = bar.tempoAutomation.value;
+            }
+
+            // Calcular duración de este compás en segundos
+            var num = bar.timeSignatureNumerator || 4;
+            var den = bar.timeSignatureDenominator || 4;
+            // Beats = numerador * (4/denominador) → negras equivalentes
+            var beatsInBar = num * (4 / den);
+            var secondsInBar = (beatsInBar / currentBPM) * 60;
+            totalSeconds += secondsInBar;
+        }
+
+        debug('Duración real calculada: ' + totalSeconds.toFixed(1) + 's (' + bars.length + ' bars, ultimo BPM=' + currentBPM + ')');
+        return totalSeconds;
+    }
+
+    // ============================================================
     // SCORE CARGADO
     // ============================================================
     api.scoreLoaded.on(function(s) {
@@ -141,14 +179,20 @@
             totalTicks = computeTotalTicks(s);
         }
 
-        var dur = s.duration || 60;
-        debug('Score: ticks=' + totalTicks + ' dur=' + dur + 's bars=' + (s.masterBars ? s.masterBars.length : '?'));
+        // Calcular duración REAL desde tempos del score
+        var realDuration = computeRealDuration(s);
+        debug('Score: ticks=' + totalTicks + ' realDur=' + realDuration.toFixed(1) + 's bars=' + (s.masterBars ? s.masterBars.length : '?'));
+
         if (!hasExternalDuration) {
-            VIDEO_TOTAL_DURATION = dur;
-            debug('Usando duracion del score: ' + VIDEO_TOTAL_DURATION + 's');
+            VIDEO_TOTAL_DURATION = realDuration;
+            debug('Usando duracion calculada del score: ' + VIDEO_TOTAL_DURATION + 's');
         } else {
             debug('Usando duracion externa: ' + VIDEO_TOTAL_DURATION + 's');
         }
+
+        // Exponer info para que Kotlin pueda leerla
+        window.totalDuration = VIDEO_TOTAL_DURATION;
+        window.scoreBPM = s.tempo || 120;
     });
 
     // ============================================================

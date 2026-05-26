@@ -30,7 +30,8 @@ data class LocalPlayerUiState(
     val selectedInstrument: String = "Guitarra",
     val availableInstruments: List<String> = emptyList(),
     val currentTimeSeconds: Float = 0f,
-    val totalDurationSeconds: Float = 180f
+    val totalDurationSeconds: Float = 180f,
+    val originalBPM: Int = 120
 )
 
 /**
@@ -133,6 +134,14 @@ class LocalPlayerViewModel @Inject constructor() : ViewModel() {
     fun updateTotalDuration(duration: Float) {
         if (duration > 0f) {
             _uiState.value = _uiState.value.copy(totalDurationSeconds = duration)
+        }
+    }
+
+    /** Actualiza el BPM original del score (leído desde AlphaTab). */
+    fun updateOriginalBPM(bpm: Int) {
+        if (bpm > 0) {
+            _uiState.value = _uiState.value.copy(originalBPM = bpm)
+            Log.d(TAG, "BPM original del score: $bpm")
         }
     }
 
