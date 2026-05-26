@@ -40,7 +40,8 @@ fun PartituraWebView(
     videoDuration: Float,
     esLocal: Boolean = false,
     modifier: Modifier = Modifier,
-    onWebViewCreated: (WebView) -> Unit = {}
+    onWebViewCreated: (WebView) -> Unit = {},
+    onBeatClicked: (Float) -> Unit = {} // 👈 Callback para capturar clics en beats
 ) {
     val safeInstrumentIndex = instrumentIndex.coerceAtLeast(0)
 
@@ -85,6 +86,19 @@ fun PartituraWebView(
                     mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                     mediaPlaybackRequiresUserGesture = false
                 }
+
+                // Puente JavaScript para registrar los clics de la partitura y notificarlos a Kotlin
+                addJavascriptInterface(
+                    object {
+                        @JavascriptInterface
+                        fun onBeatClicked(seconds: Float) {
+                            post {
+                                onBeatClicked(seconds)
+                            }
+                        }
+                    },
+                    "AndroidPartitura"
+                )
 
                 // Redirigir logs JS de la consola del WebView a Logcat
                 webChromeClient = object : WebChromeClient() {

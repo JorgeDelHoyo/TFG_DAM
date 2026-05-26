@@ -25,10 +25,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import java.io.ByteArrayInputStream
 
+data class SeekEvent(
+    val seconds: Float,
+    val timestamp: Long = System.nanoTime()
+)
+
 data class ExternalControls(
     val play: Boolean = false,
     val playbackSpeed: Float = 1.0f,
-    val isMuted: Boolean = false // 👈 Agregamos el estado de mute
+    val isMuted: Boolean = false, // 👈 Agregamos el estado de mute
+    val seekEvent: SeekEvent? = null // 👈 Evento único de seek con timestamp para evitar repeticiones
 )
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -45,6 +51,7 @@ fun YouTubePlayer(
     val latestOnCurrentSecond by rememberUpdatedState(onCurrentSecond)
     val latestOnDurationReady by rememberUpdatedState(onDurationReady)
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var lastProcessedSeekEventTimestamp by remember { mutableStateOf<Long?>(null) } // 👈 Recordar el timestamp del último seek procesado
 
     DisposableEffect(Unit) {
         onDispose {
@@ -135,6 +142,14 @@ fun YouTubePlayer(
                 // 👈 Evaluamos dinámicamente si hay que mutear o desmutear en el JS
                 val muteCommand = if (controls.isMuted) "muteVideo" else "unmuteVideo"
                 webView.evaluateJavascript("if (window.$muteCommand) { $muteCommand(); }", null)
+
+                // 👈 Si hay un evento de seek y no ha sido procesado aún
+                controls.seekEvent?.let { event ->
+                    if (event.timestamp != lastProcessedSeekEventTimestamp) {
+                        lastProcessedSeekEventTimestamp = event.timestamp
+                        webView.evaluateJavascript("if (window.seekTo) { seekTo(${event.seconds}); }", null)
+                    }
+                }
             }
         }
     )
@@ -261,6 +276,12 @@ private fun buildYouTubeHtml(videoId: String, autoplay: Boolean): String {
                 function unmuteVideo() {
                     pendingMute = false;
                     if (player && player.unMute) { player.unMute(); }
+                }
+
+                function seekTo(seconds) {
+                    if (player && player.seekTo) {
+                        player.seekTo(seconds, true);
+                    }
                 }
 
                  let durationReported = false;

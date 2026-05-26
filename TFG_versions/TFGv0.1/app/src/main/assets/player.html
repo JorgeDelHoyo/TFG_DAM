@@ -175,6 +175,49 @@
     }
 
     // ============================================================
+    // OBTENER SEGUNDO EXACTO DE UN BEAT CLICKEADO (Cambio de tempo compatible)
+    // ============================================================
+    function getBeatTimeInSeconds(beat) {
+        if (!api || !api.score || !api.score.masterBars || !beat || !beat.voice || !beat.voice.bar) return 0;
+        
+        var targetBarIndex = beat.voice.bar.index;
+        var bars = api.score.masterBars;
+        var currentBPM = api.score.tempo || 120;
+        var timeInSeconds = 0;
+        
+        // 1. Sumar la duracion en segundos de todos los compases anteriores
+        for (var i = 0; i < targetBarIndex; i++) {
+            var bar = bars[i];
+            if (bar.tempoAutomation && bar.tempoAutomation.value > 0) {
+                currentBPM = bar.tempoAutomation.value;
+            }
+            var num = bar.timeSignatureNumerator || 4;
+            var den = bar.timeSignatureDenominator || 4;
+            var beatsInBar = num * (4 / den);
+            var secondsInBar = (beatsInBar / currentBPM) * 60;
+            timeInSeconds += secondsInBar;
+        }
+        
+        // 2. Calcular los segundos transcurridos dentro del compas actual
+        var currentBar = bars[targetBarIndex];
+        if (currentBar.tempoAutomation && currentBar.tempoAutomation.value > 0) {
+            currentBPM = currentBar.tempoAutomation.value;
+        }
+        var num = currentBar.timeSignatureNumerator || 4;
+        var den = currentBar.timeSignatureDenominator || 4;
+        var beatsInBar = num * (4 / den);
+        var secondsInBar = (beatsInBar / currentBPM) * 60;
+        
+        var totalBarTicks = num * (960 * 4 / den);
+        var beatStartTick = beat.start || 0;
+        
+        var beatOffsetSeconds = (beatStartTick / totalBarTicks) * secondsInBar;
+        timeInSeconds += beatOffsetSeconds;
+        
+        return timeInSeconds;
+    }
+
+    // ============================================================
     // SCORE CARGADO
     // ============================================================
     api.scoreLoaded.on(function(s) {
@@ -219,6 +262,18 @@
         api.masterVolume = 0;
         debug('Player LISTO. Cursor nativo activo.');
         debug('totalTicks=' + totalTicks + ' VIDEO_DUR=' + VIDEO_TOTAL_DURATION);
+    });
+
+    // ============================================================
+    // DETECTAR CLICK EN LA PARTITURA Y SELECCIONAR SEGUNDO (Seek)
+    // ============================================================
+    api.beatMouseDown.on(function(beat) {
+        if (!beat) return;
+        var timeInSeconds = getBeatTimeInSeconds(beat);
+        debug('Beat clickeado: tick=' + beat.start + ' segs=' + timeInSeconds.toFixed(2));
+        if (window.AndroidPartitura && typeof window.AndroidPartitura.onBeatClicked === 'function') {
+            window.AndroidPartitura.onBeatClicked(timeInSeconds);
+        }
     });
 
     // ============================================================

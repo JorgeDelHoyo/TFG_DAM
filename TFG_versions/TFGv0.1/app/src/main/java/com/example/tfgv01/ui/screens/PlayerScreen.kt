@@ -58,6 +58,7 @@ fun PlayerScreen(
     }
     val partituraWebViewRef = remember { mutableStateOf<WebView?>(null) }
     var videoDuration by remember { mutableStateOf(180f) }
+    var seekEvent by remember { mutableStateOf<SeekEvent?>(null) } // 👈 Estado de Compose para eventos de seek
 
     // --- ⚡ MÓDULO DE FLUIDEZ ---
     var lastYoutubeTime by remember { mutableStateOf(0f) }
@@ -121,6 +122,14 @@ fun PlayerScreen(
                         onWebViewCreated = { webView ->
                             partituraWebViewRef.value = webView
                             if (isPlaying) webView.startAutoScroll(currentTime + syncOffset)
+                        },
+                        onBeatClicked = { seconds ->
+                            // 🚀 Cuando el usuario hace click en un compás/nota:
+                            val targetEvent = SeekEvent(seconds)
+                            seekEvent = targetEvent
+                            viewModel.seekTo(seconds)
+                            // Corregimos la partitura de inmediato en local para máxima reactividad visual
+                            partituraWebViewRef.value?.correctAutoScrollTime(seconds + syncOffset)
                         }
                     )
                 }
@@ -276,6 +285,7 @@ fun PlayerScreen(
                 videoId = song.youtubeVideoId,
                 isPlaying = isPlaying,
                 isMuted = isMuted,
+                seekEvent = seekEvent, // 👈 Pasamos el evento de seek aquí
                 onTimeUpdate = { seconds ->
                     viewModel.updateCurrentTime(seconds)
                     partituraWebViewRef.value?.correctAutoScrollTime(seconds + syncOffset)
@@ -316,6 +326,7 @@ private fun YouTubePlayerSection(
     videoId: String,
     isPlaying: Boolean,
     isMuted: Boolean,
+    seekEvent: SeekEvent? = null, // 👈 Recibimos el evento de seek
     onTimeUpdate: (Float) -> Unit,
     onDurationUpdate: (Float) -> Unit,
     modifier: Modifier = Modifier
@@ -332,7 +343,8 @@ private fun YouTubePlayerSection(
             externalControls = ExternalControls(
                 play = isPlaying,
                 playbackSpeed = 1.0f,
-                isMuted = isMuted
+                isMuted = isMuted,
+                seekEvent = seekEvent // 👈 Y se lo propagamos a YouTubePlayer
             ),
             modifier = Modifier.fillMaxSize()
         )
