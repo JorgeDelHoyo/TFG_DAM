@@ -29,7 +29,6 @@ import com.example.tfgv01.data.model.Song
 import com.example.tfgv01.ui.components.*
 import com.example.tfgv01.ui.viewmodel.PlayerViewModel
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.ui.text.font.FontWeight
 
 @Composable
 fun PlayerScreen(

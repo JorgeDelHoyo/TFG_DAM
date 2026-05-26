@@ -266,7 +266,7 @@ private fun LocalSongsSection(
                                                 }
                                             )
                                             DropdownMenuItem(
-                                                text = { Text("Eliminar", color = Color.Red) },
+                                                text = { Text("Eliminar", color = MaterialTheme.colorScheme.error) },
                                                 onClick = {
                                                     menuExpanded = false
                                                     onDeleteSongClick(song)
