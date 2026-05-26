@@ -136,7 +136,7 @@ private fun SplashScreen(onSplashFinished: () -> Unit) {
         ) {
             // Logo (usa el drawable del adaptive icon)
             Image(
-                painter = painterResource(id = R.mipmap.ic_launcher_foreground),
+                painter = painterResource(id = R.drawable.ic_launcher_foreground),
                 contentDescription = "Logo Arpeg.io",
                 modifier = Modifier.size(160.dp)
             )
