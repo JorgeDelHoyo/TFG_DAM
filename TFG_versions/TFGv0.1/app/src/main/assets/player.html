@@ -6,320 +6,284 @@
     <title>Arpegio Player</title>
     <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.3.0/dist/alphaTab.js"></script>
     <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; padding: 0; background: #fff; overflow: hidden; }
+        body { margin: 0; padding: 0; background-color: #ffffff; overflow: hidden; }
 
         .at-container {
             height: 100vh;
-            overflow-y: auto !important;
+            overflow-y: scroll !important;
             overflow-x: hidden !important;
             position: relative;
+            background-color: #ffffff !important;
             -webkit-overflow-scrolling: touch;
         }
+        #alphaTab { width: 100% !important; background: #ffffff; position: relative; padding-bottom: 500px; }
 
-        #alphaTab {
-            width: 100% !important;
-            position: relative;
-            padding-bottom: 300px;
-        }
+        #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; display: none; z-index: 10; background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 8px; }
 
-        #loading {
-            position: fixed; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            color: #fff; font-size: 18px; display: none; z-index: 10;
-            background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 8px;
-        }
+        /* Ocultar cursores nativos de AlphaTab */
+        .at-cursor-beat, .at-selection, .at-cursor { display: none !important; }
 
-        /* =============================================
-           CURSOR CUSTOM A NIVEL DE BEAT
-           Mismo aspecto visual que GProTab.net
-           ============================================= */
-
-        /* Barra resaltada del compás actual */
-        #cursor-bar {
+        /* Cursor maestro propio */
+        #master-cursor {
             position: absolute;
-            z-index: 100;
-            background: rgba(255, 242, 0, 0.15);
+            background-color: rgba(255, 0, 0, 0.22) !important;
+            border-left: 3px solid #ff0000 !important;
+            z-index: 2500 !important;
             pointer-events: none;
             display: none;
-            transition: left 0.06s linear, top 0s;
+            box-sizing: border-box;
+            transition: left 0.15s linear;
         }
-
-        /* Línea vertical roja en el beat actual */
-        #cursor-beat {
-            position: absolute;
-            z-index: 101;
-            width: 3px;
-            background: rgba(220, 0, 0, 0.75);
-            pointer-events: none;
-            display: none;
-            transition: left 0.08s linear, top 0s;
-        }
-
-        /* Ocultar cursores nativos de AlphaTab (usamos los nuestros) */
-        .at-cursor-bar, .at-cursor-beat, .at-selection { display: none !important; }
     </style>
 </head>
 <body>
 
 <div class="at-container" id="scroll-container">
-    <div id="alphaTab">
-        <div id="cursor-bar"></div>
-        <div id="cursor-beat"></div>
-    </div>
+    <div id="alphaTab"></div>
+    <div id="master-cursor"></div>
 </div>
 <div id="loading">Cargando partitura...</div>
 
 <script>
-    // ============================================================
-    // VARIABLES GLOBALES
-    // ============================================================
-    var api = null;
-    var totalTicks = 0;
+    var api = null, isInitialized = false, pendingTrackIndex = 0;
+    var totalDuration = 60, totalTicks = 96000;
     var VIDEO_TOTAL_DURATION = 180;
     var hasExternalDuration = false;
-    var beatMap = [];       // Array plano de beats ordenados por tick
-    var currentRow = -1;    // Fila/sistema actual del cursor
-    var container = null;
-    var cursorBar = null;
-    var cursorBeat = null;
+
+    var ultimoRenglonY = -1;
+    var masterCursorEl = null;
+    var cajasCompases = [];
     var resizeTimer = null;
+    var userScrolling = false;
+    var userScrollTimer = null;
 
-    function debug(m) { console.log('[ARPEGIO]', m); }
-
-    // ============================================================
-    // REFERENCIAS DOM
-    // ============================================================
-    container = document.getElementById('scroll-container');
-    cursorBar = document.getElementById('cursor-bar');
-    cursorBeat = document.getElementById('cursor-beat');
+    function debug(m) { console.log('[JS]', m); }
 
     // ============================================================
-    // INICIALIZACIÓN DE ALPHATAB (sin reproductor, solo renderizado)
+    // INICIALIZACIÓN DE ALPHATAB (mismo config que el original)
     // ============================================================
     api = new alphaTab.AlphaTabApi(document.getElementById('alphaTab'), {
-        core: {
-            fileReadUrl: 'https://appassets.androidplatform.net/assets/',
-            includeNoteBounds: true
-        },
-        display: {
-            layoutMode: 1  // Page layout
-        }
+        player: { enablePlayer: false, enableCursor: false },
+        core: { fileReadUrl: 'https://appassets.androidplatform.net/assets/', includeNoteBounds: true },
+        display: { layout: 'page', scrollMode: 'off' }
     });
 
     // ============================================================
-    // EVENTO: Score cargado
+    // EVENTOS
     // ============================================================
-    api.scoreLoaded.on(function(score) {
-        totalTicks = score.endTick || 0;
-        var durationSec = score.duration || 60;
-        debug('Score cargado. Ticks=' + totalTicks + ' Dur=' + durationSec + 's');
+    if (api.scoreLoaded && api.scoreLoaded.on) {
+        api.scoreLoaded.on(function(s) {
+            totalDuration = s.duration || 60;
+            totalTicks = s.endTick || 96000;
+            debug('Score cargado. Dur=' + totalDuration + 's, Ticks=' + totalTicks);
+            if (!hasExternalDuration) {
+                VIDEO_TOTAL_DURATION = totalDuration;
+            }
+        });
+    }
 
-        if (!hasExternalDuration) {
-            VIDEO_TOTAL_DURATION = durationSec;
-        }
-    });
+    if (api.renderFinished && api.renderFinished.on) {
+        api.renderFinished.on(function() {
+            document.getElementById('loading').style.display = 'none';
+            masterCursorEl = document.getElementById('master-cursor');
+            debug('Render OK. Mapeando compases...');
+            setTimeout(function() { mapearCompasesDesdeGeometria(); }, 500);
+        });
+    }
 
     // ============================================================
-    // EVENTO: Render terminado → construir mapa de beats
-    // ============================================================
-    api.renderFinished.on(function() {
-        document.getElementById('loading').style.display = 'none';
-        buildBeatMap();
-        debug('Render OK. Beats mapeados: ' + beatMap.length);
-    });
-
-    // ============================================================
-    // Re-render al rotar la pantalla (con debounce)
+    // RE-RENDER AL ROTAR PANTALLA (debounce 300ms)
     // ============================================================
     window.addEventListener('resize', function() {
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(function() {
             debug('Resize → re-render');
-            currentRow = -1;
+            isInitialized = false;
+            ultimoRenglonY = -1;
+            if (masterCursorEl) masterCursorEl.style.display = 'none';
             api.render();
         }, 300);
     });
 
     // ============================================================
-    // CONSTRUIR MAPA DE BEATS desde boundsLookup
-    // Cada entrada: { beatX, barX, barY, barW, barH, tick, row }
+    // DETECTAR SCROLL MANUAL DEL USUARIO
+    // Cuando el usuario hace scroll, desactivamos el auto-scroll
+    // temporalmente para que pueda mirar libremente.
     // ============================================================
-    function buildBeatMap() {
-        beatMap = [];
-        var lookup = api.renderer.boundsLookup;
-        if (!lookup) { debug('⚠ Sin boundsLookup'); return; }
+    var container = document.getElementById('scroll-container');
+    container.addEventListener('touchstart', function() {
+        userScrolling = true;
+        clearTimeout(userScrollTimer);
+    });
+    container.addEventListener('touchend', function() {
+        clearTimeout(userScrollTimer);
+        userScrollTimer = setTimeout(function() { userScrolling = false; }, 4000);
+    });
 
-        var groups = lookup.staveGroups;
-        if (!groups) { debug('⚠ Sin staveGroups'); return; }
+    // ============================================================
+    // MAPEAR COMPASES DESDE GEOMETRÍA (igual que el original, FUNCIONA)
+    // ============================================================
+    function mapearCompasesDesdeGeometria() {
+        cajasCompases = [];
+        ultimoRenglonY = -1;
 
-        for (var si = 0; si < groups.length; si++) {
-            var group = groups[si];
-            if (!group.bars) continue;
+        if (!api.score || !api.score.masterBars) {
+            debug('Error: sin score.masterBars');
+            return;
+        }
 
-            for (var ri = 0; ri < group.bars.length; ri++) {
-                var masterBar = group.bars[ri];
-                if (!masterBar.bars || masterBar.bars.length === 0) continue;
-
-                // Bounds del compás completo (para el highlight amarillo)
-                var mVis = masterBar.visualBounds;
-                var mReal = masterBar.realBounds;
-
-                // Usamos la primera staff (guitarra principal)
-                var staff = masterBar.bars[0];
-                if (!staff || !staff.beats) continue;
-
-                for (var bei = 0; bei < staff.beats.length; bei++) {
-                    var bb = staff.beats[bei];
-                    var beat = bb.beat;
-                    var bVis = bb.visualBounds;
-
-                    // Obtener tick absoluto del beat
-                    var tick = 0;
-                    if (beat) {
-                        if (typeof beat.playbackStart !== 'undefined') tick = beat.playbackStart;
-                        else if (typeof beat.absoluteStart !== 'undefined') tick = beat.absoluteStart;
+        try {
+            var lookup = api.boundsLookup || (api.renderer ? api.renderer.boundsLookup : null);
+            if (lookup && lookup.staffSystems) {
+                lookup.staffSystems.forEach(function(system) {
+                    if (system.bars) {
+                        system.bars.forEach(function(barBounds) {
+                            var trackIdx = -1;
+                            if (barBounds.bar) {
+                                if (barBounds.bar.track) {
+                                    trackIdx = barBounds.bar.track.index;
+                                } else if (typeof barBounds.bar.trackIndex !== 'undefined') {
+                                    trackIdx = barBounds.bar.trackIndex;
+                                }
+                            }
+                            if (trackIdx === pendingTrackIndex) {
+                                var bounds = barBounds.realBounds || barBounds.visualBounds;
+                                if (bounds && bounds.w > 0 && bounds.h > 0) {
+                                    cajasCompases.push({
+                                        index: barBounds.bar.index,
+                                        x: bounds.x,
+                                        y: bounds.y,
+                                        w: bounds.w,
+                                        h: bounds.h
+                                    });
+                                }
+                            }
+                        });
                     }
-
-                    beatMap.push({
-                        beatX: bVis ? bVis.x : 0,
-                        barX:  mVis ? mVis.x : 0,
-                        barY:  mReal ? mReal.y : (mVis ? mVis.y : 0),
-                        barW:  mVis ? mVis.w : 0,
-                        barH:  mReal ? mReal.h : (mVis ? mVis.h : 0),
-                        tick:  tick,
-                        row:   si
-                    });
-                }
-            }
-        }
-
-        // Ordenar por tick ascendente
-        beatMap.sort(function(a, b) { return a.tick - b.tick; });
-
-        // Si no pudimos obtener ticks (todos son 0), distribuir uniformemente
-        if (beatMap.length > 1 && beatMap[beatMap.length - 1].tick === 0) {
-            debug('⚠ Ticks no disponibles, distribuyendo uniformemente');
-            for (var i = 0; i < beatMap.length; i++) {
-                beatMap[i].tick = Math.round((i / beatMap.length) * totalTicks);
-            }
-        }
-    }
-
-    // ============================================================
-    // BÚSQUEDA BINARIA: encontrar el beat en un tick dado
-    // ============================================================
-    function findBeatAtTick(tick) {
-        if (beatMap.length === 0) return null;
-        var lo = 0, hi = beatMap.length - 1;
-        while (lo <= hi) {
-            var mid = (lo + hi) >> 1;
-            if (beatMap[mid].tick <= tick) lo = mid + 1;
-            else hi = mid - 1;
-        }
-        return hi >= 0 ? beatMap[hi] : beatMap[0];
-    }
-
-    // ============================================================
-    // POSICIONAR CURSOR en un beat dado
-    // ============================================================
-    function positionCursor(beat) {
-        if (!beat) return;
-
-        // Línea roja vertical del beat
-        cursorBeat.style.display = 'block';
-        cursorBeat.style.left   = beat.beatX + 'px';
-        cursorBeat.style.top    = beat.barY + 'px';
-        cursorBeat.style.height = beat.barH + 'px';
-
-        // Fondo amarillo del compás
-        cursorBar.style.display = 'block';
-        cursorBar.style.left   = beat.barX + 'px';
-        cursorBar.style.top    = beat.barY + 'px';
-        cursorBar.style.width  = beat.barW + 'px';
-        cursorBar.style.height = beat.barH + 'px';
-
-        // Auto-scroll SOLO al cambiar de línea/sistema
-        if (beat.row !== currentRow) {
-            currentRow = beat.row;
-            var scrollTop = container.scrollTop;
-            var viewH = container.clientHeight;
-            var cursorTop = beat.barY;
-
-            // Solo scrollear si el cursor queda fuera de la zona visible
-            if (cursorTop < scrollTop + 40 || cursorTop + beat.barH > scrollTop + viewH - 40) {
-                container.scrollTo({
-                    top: Math.max(0, cursorTop - 80),
-                    behavior: 'smooth'
                 });
             }
+
+            cajasCompases.sort(function(a, b) { return a.index - b.index; });
+
+            if (cajasCompases.length > 0) {
+                isInitialized = true;
+                debug('Compases mapeados: ' + cajasCompases.length);
+            } else {
+                // Plan B: distribución uniforme
+                var numBars = Math.max(3, api.score.masterBars.length);
+                var totalH = document.getElementById('alphaTab').clientHeight || 600;
+                var altoIndividual = totalH / numBars;
+                for (var k = 0; k < numBars; k++) {
+                    cajasCompases.push({
+                        index: k,
+                        x: 0,
+                        y: k * altoIndividual,
+                        w: document.getElementById('alphaTab').clientWidth || 360,
+                        h: altoIndividual
+                    });
+                }
+                isInitialized = true;
+                debug('Modo fallback: ' + numBars + ' compases distribuidos');
+            }
+        } catch (e) {
+            debug('Error mapeando: ' + e.message);
+        }
+    }
+
+    // ============================================================
+    // SINCRONIZAR CURSOR CON EL TIEMPO DEL VÍDEO
+    // MEJORA: scroll solo al cambiar de línea Y solo si el usuario
+    //         no está haciendo scroll manual
+    // ============================================================
+    function sincronizarConVideo(seconds) {
+        if (!isInitialized || cajasCompases.length === 0 || !masterCursorEl) return;
+
+        var duracionPorCompas = VIDEO_TOTAL_DURATION / cajasCompases.length;
+        var indexCompas = Math.floor(seconds / duracionPorCompas);
+        if (indexCompas >= cajasCompases.length) indexCompas = cajasCompases.length - 1;
+        if (indexCompas < 0) indexCompas = 0;
+
+        var compas = cajasCompases[indexCompas];
+
+        // Progreso dentro del compás actual (0.0 → 1.0)
+        var tiempoInicio = indexCompas * duracionPorCompas;
+        var progreso = (seconds - tiempoInicio) / duracionPorCompas;
+        if (progreso > 1) progreso = 1;
+        if (progreso < 0) progreso = 0;
+
+        var cursorX = compas.x + (progreso * compas.w);
+
+        masterCursorEl.style.display = 'block';
+
+        // ¿Cambio de línea/renglón?
+        if (compas.y !== ultimoRenglonY) {
+            // Salto de línea: quitar transición para que no se vea volar
+            masterCursorEl.style.transition = 'none';
+            masterCursorEl.style.left = cursorX + 'px';
+            masterCursorEl.style.top = (compas.y + 4) + 'px';
+            masterCursorEl.style.width = '24px';
+            masterCursorEl.style.height = (compas.h - 8) + 'px';
+
+            void masterCursorEl.offsetWidth; // Forzar reflow
+
+            masterCursorEl.style.transition = 'left 0.15s linear';
+            ultimoRenglonY = compas.y;
+
+            // MEJORA: Auto-scroll solo si el usuario NO está haciendo scroll manual
+            if (!userScrolling) {
+                var scrollContainer = document.getElementById('scroll-container');
+                var targetScroll = compas.y - (scrollContainer.clientHeight * 0.15);
+                if (targetScroll < 0) targetScroll = 0;
+                scrollContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
+            }
+        } else {
+            // Dentro de la misma línea: mover con transición suave
+            masterCursorEl.style.left = cursorX + 'px';
+            masterCursorEl.style.top = (compas.y + 4) + 'px';
+            masterCursorEl.style.width = '24px';
+            masterCursorEl.style.height = (compas.h - 8) + 'px';
         }
     }
 
     // ============================================================
     // API PÚBLICA — Llamadas desde Kotlin
     // ============================================================
+    function correctAutoScrollTime(time) { sincronizarConVideo(time); }
+    function updateScrollPosition(time) { sincronizarConVideo(time); }
+    function startAutoScroll(resumeTime) { sincronizarConVideo(resumeTime); }
+    function stopAutoScroll() {}
 
-    /** Sincroniza el cursor con el tiempo de reproducción (YouTube o metrónomo) */
-    function correctAutoScrollTime(seconds) {
-        if (beatMap.length === 0 || totalTicks <= 0 || VIDEO_TOTAL_DURATION <= 0) return;
-        var progress = Math.max(0, Math.min(1, seconds / VIDEO_TOTAL_DURATION));
-        var tick = Math.round(progress * totalTicks);
-        positionCursor(findBeatAtTick(tick));
+    function setVideoDuration(duration) {
+        if (duration && Number(duration) > 0) {
+            VIDEO_TOTAL_DURATION = Number(duration);
+            hasExternalDuration = true;
+        }
     }
 
-    /** Carga una canción */
     function loadSong(fileName, trackIndex, duration) {
-        var ti = Math.max(0, Number(trackIndex) || 0);
-
+        pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
         if (duration && Number(duration) > 0) {
             VIDEO_TOTAL_DURATION = Number(duration);
             hasExternalDuration = true;
         } else {
             hasExternalDuration = false;
         }
-
-        beatMap = [];
-        currentRow = -1;
-        cursorBar.style.display = 'none';
-        cursorBeat.style.display = 'none';
         document.getElementById('loading').style.display = 'block';
-
-        var url = fileName.startsWith('http')
-            ? fileName
-            : 'https://appassets.androidplatform.net/assets/' + fileName.replace(/^\/+/, '');
-
-        debug('Cargando: ' + url + ' track=' + ti + ' dur=' + VIDEO_TOTAL_DURATION);
-        api.load(url, [ti]);
+        isInitialized = false;
+        if (masterCursorEl) masterCursorEl.style.display = 'none';
+        api.load(fileName.startsWith('http') ? fileName : 'https://appassets.androidplatform.net/assets/' + fileName.replace(/^\/+/, ''), [pendingTrackIndex]);
     }
 
-    /** Aliases para compatibilidad */
-    function updateScrollPosition(t) { correctAutoScrollTime(t); }
-    function startAutoScroll(t)      { correctAutoScrollTime(t); }
-    function stopAutoScroll()         { /* cursor se queda donde está */ }
-
-    /** Establece la duración del vídeo YouTube */
-    function setVideoDuration(d) {
-        if (d && Number(d) > 0) {
-            VIDEO_TOTAL_DURATION = Number(d);
-            hasExternalDuration = true;
-            debug('Duración externa: ' + VIDEO_TOTAL_DURATION + 's');
-        }
-    }
-
-    /** Cambia de pista/instrumento */
     function changeTrack(trackIndex) {
-        var ti = Math.max(0, Number(trackIndex) || 0);
-        if (api && api.score && api.score.tracks[ti]) {
-            currentRow = -1;
-            cursorBar.style.display = 'none';
-            cursorBeat.style.display = 'none';
-            api.renderTracks([api.score.tracks[ti]]);
+        pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
+        if (api && api.score) {
+            isInitialized = false;
+            if (masterCursorEl) masterCursorEl.style.display = 'none';
+            api.renderTracks([api.score.tracks[pendingTrackIndex]]);
         }
     }
 
-    /** ¿Está listo? */
-    function isReady() { return beatMap.length > 0; }
+    function isReady() { return isInitialized; }
 </script>
 </body>
 </html>
