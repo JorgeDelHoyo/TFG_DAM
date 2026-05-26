@@ -129,7 +129,7 @@ fun PlayerScreen(
 
         // 🔹 3. BOTTOM BAR DESPLEGABLE Y RESPONSIVA
         Surface(
-            color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
+            color = MaterialTheme.colorScheme.inverseSurface,
             modifier = Modifier
                 .fillMaxWidth()
                 .wrapContentHeight()
@@ -137,6 +137,8 @@ fun PlayerScreen(
             shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
             shadowElevation = 8.dp
         ) {
+            val barTextColor = MaterialTheme.colorScheme.inverseOnSurface
+
             Column(
                 modifier = Modifier.fillMaxWidth()
                     .padding(top = 4.dp, bottom = if (isLandscape) 4.dp else 8.dp)
@@ -155,12 +157,13 @@ fun PlayerScreen(
                     Icon(
                         imageVector = if (isBottomBarExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
                         contentDescription = "Expandir/Contraer",
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = barTextColor
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = if (isBottomBarExpanded) "Cerrar controles" else "Mostrar controles",
-                        style = MaterialTheme.typography.labelLarge
+                        style = MaterialTheme.typography.labelLarge,
+                        color = barTextColor
                     )
                 }
 
@@ -178,22 +181,29 @@ fun PlayerScreen(
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         // Botón Volver
-                        FilledTonalIconButton(
+                        IconButton(
                             onClick = onNavigateBack,
-                            modifier = Modifier.size(if (isLandscape) 48.dp else 44.dp)
+                            modifier = Modifier
+                                .size(if (isLandscape) 48.dp else 44.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", Modifier.size(22.dp))
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", Modifier.size(22.dp), tint = barTextColor)
                         }
 
                         // Botón Mute/Unmute
-                        FilledTonalIconButton(
+                        IconButton(
                             onClick = { viewModel.toggleMute() },
-                            modifier = Modifier.size(if (isLandscape) 48.dp else 44.dp)
+                            modifier = Modifier
+                                .size(if (isLandscape) 48.dp else 44.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
                         ) {
                             Icon(
                                 if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
                                 "Volumen",
-                                Modifier.size(22.dp)
+                                Modifier.size(22.dp),
+                                tint = barTextColor
                             )
                         }
 
@@ -201,7 +211,8 @@ fun PlayerScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "⏱️ ${String.format("%.1f", currentTime)}s",
-                                style = MaterialTheme.typography.labelSmall
+                                style = MaterialTheme.typography.labelSmall,
+                                color = barTextColor.copy(alpha = 0.8f)
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             FloatingActionButton(
@@ -210,7 +221,9 @@ fun PlayerScreen(
                                     if (isPlaying) partituraWebViewRef.value?.stopAutoScroll()
                                     else partituraWebViewRef.value?.startAutoScroll(currentTime + syncOffset)
                                 },
-                                modifier = Modifier.size(if (isLandscape) 48.dp else 50.dp)
+                                modifier = Modifier.size(if (isLandscape) 48.dp else 50.dp),
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
                             ) {
                                 Icon(
                                     if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
@@ -222,24 +235,31 @@ fun PlayerScreen(
 
                         // Offset Sync Controls (Sincronización manual)
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Sincronizar", style = MaterialTheme.typography.labelSmall)
+                            Text("Sincronizar", style = MaterialTheme.typography.labelSmall, color = barTextColor.copy(alpha = 0.8f))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                FilledTonalIconButton(
+                                IconButton(
                                     onClick = { viewModel.adjustSyncOffset(-0.5f) },
-                                    modifier = Modifier.size(36.dp)
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
                                 ) {
-                                    Text("-", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                                    Text("-", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = barTextColor)
                                 }
                                 Text(
                                     text = "${if (syncOffset > 0) "+" else ""}${String.format("%.1f", syncOffset)}s",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                    modifier = Modifier.padding(horizontal = 4.dp),
+                                    color = barTextColor
                                 )
-                                FilledTonalIconButton(
+                                IconButton(
                                     onClick = { viewModel.adjustSyncOffset(0.5f) },
-                                    modifier = Modifier.size(36.dp)
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
                                 ) {
-                                    Text("+", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                                    Text("+", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = barTextColor)
                                 }
                             }
                         }

@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import android.webkit.WebView
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -146,18 +148,21 @@ fun LocalPlayerScreen(
         }
 
         // 🔹 3. BOTTOM BAR DESPLEGABLE
-        val targetHeight = if (isBottomBarExpanded) (if (isLandscape) 110.dp else 155.dp) else 48.dp
-        val barHeight by animateDpAsState(targetValue = targetHeight)
-
         Surface(
+            color = MaterialTheme.colorScheme.inverseSurface,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(barHeight),
-            tonalElevation = 8.dp,
-            shadowElevation = 12.dp,
-            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                .wrapContentHeight()
+                .animateContentSize(),
+            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+            shadowElevation = 8.dp
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            val barTextColor = MaterialTheme.colorScheme.inverseOnSurface
+
+            Column(
+                modifier = Modifier.fillMaxWidth()
+                    .padding(top = 4.dp, bottom = if (isLandscape) 4.dp else 8.dp)
+            ) {
 
                 // Tirador de la barra
                 Box(
@@ -175,12 +180,13 @@ fun LocalPlayerScreen(
                         Icon(
                             imageVector = if (isBottomBarExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
                             contentDescription = "Expandir/Contraer",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = barTextColor
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (isBottomBarExpanded) "Cerrar controles" else "Mostrar controles de tempo",
-                            style = MaterialTheme.typography.labelLarge
+                            style = MaterialTheme.typography.labelLarge,
+                            color = barTextColor
                         )
                     }
                 }
@@ -193,7 +199,7 @@ fun LocalPlayerScreen(
                 ) {
                     Column(
                         modifier = Modifier
-                            .fillMaxSize()
+                            .fillMaxWidth()
                             .padding(horizontal = 24.dp, vertical = 4.dp),
                         verticalArrangement = Arrangement.Center
                     ) {
@@ -201,15 +207,16 @@ fun LocalPlayerScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.Speed, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.Speed, contentDescription = null, tint = barTextColor)
                             Spacer(modifier = Modifier.width(8.dp))
 
-                            // 🚀 CAMBIO VISUAL: Muestra el tempo en BPM en lugar de porcentaje
+                            // 🚀 Muestra el tempo en BPM
                             Text(
                                 text = "Tempo: $bpmActuales BPM",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.width(110.dp) // Un pelín más ancho para que quepa "BPM" holgadamente
+                                color = barTextColor,
+                                modifier = Modifier.width(110.dp)
                             )
 
                             Slider(
@@ -217,7 +224,11 @@ fun LocalPlayerScreen(
                                 onValueChange = { viewModel.updateTempo(it) },
                                 valueRange = 0.5f..2.0f,
                                 steps = 5,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                colors = SliderDefaults.colors(
+                                    thumbColor = MaterialTheme.colorScheme.primary,
+                                    activeTrackColor = MaterialTheme.colorScheme.primary
+                                )
                             )
                         }
 
@@ -228,14 +239,21 @@ fun LocalPlayerScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
-                            FilledTonalIconButton(onClick = onNavigateBack, modifier = Modifier.size(44.dp)) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, Modifier.size(22.dp))
+                            IconButton(
+                                onClick = onNavigateBack,
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, Modifier.size(22.dp), tint = barTextColor)
                             }
 
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = "Reproductor Nativo",
-                                    style = MaterialTheme.typography.labelMedium
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = barTextColor.copy(alpha = 0.8f)
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 FloatingActionButton(
@@ -247,7 +265,9 @@ fun LocalPlayerScreen(
                                             partituraWebViewRef.value?.evaluateJavascript("playNative();", null)
                                         }
                                     },
-                                    modifier = Modifier.size(50.dp)
+                                    modifier = Modifier.size(50.dp),
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
                                 ) {
                                     Icon(if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(26.dp))
                                 }
