@@ -126,7 +126,7 @@ fun PlayerScreen(
         }
 
         // 🔹 3. BOTTOM BAR DESPLEGABLE Y RESPONSIVA
-        val targetHeight = if (isBottomBarExpanded) (if (isLandscape) 115.dp else 140.dp) else 48.dp
+        val targetHeight = if (isBottomBarExpanded) (if (isLandscape) 80.dp else 110.dp) else 48.dp
         val barHeight by animateDpAsState(targetValue = targetHeight)
 
         Surface(
@@ -137,148 +137,108 @@ fun PlayerScreen(
             shadowElevation = 12.dp,
             shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Column(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize()) {
 
-                    // Tirador / Botón de control de despliegue (Siempre visible)
+                // Tirador (Siempre visible)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .clickable { isBottomBarExpanded = !isBottomBarExpanded }
+                        .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = if (isBottomBarExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                        contentDescription = "Expandir/Contraer",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isBottomBarExpanded) "Cerrar controles" else "Mostrar controles",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+
+                // Contenido expandido
+                AnimatedVisibility(
+                    visible = isBottomBarExpanded,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp)
-                            .clickable { isBottomBarExpanded = !isBottomBarExpanded }
-                            .padding(horizontal = 16.dp),
+                            .padding(horizontal = 24.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        Icon(
-                            imageVector = if (isBottomBarExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                            contentDescription = "Expandir/Contraer",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isBottomBarExpanded) "Cerrar controles" else "Mostrar controles",
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    }
-
-                    // Contenido expandido (solo botones — YouTube va aparte)
-                    AnimatedVisibility(
-                        visible = isBottomBarExpanded,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(start = 16.dp, end = if (isLandscape) 170.dp else 16.dp, bottom = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        // Botón Volver
+                        FilledTonalIconButton(
+                            onClick = onNavigateBack,
+                            modifier = Modifier.size(if (isLandscape) 48.dp else 44.dp)
                         ) {
-                            if (isLandscape) {
-                                // DISEÑO HORIZONTAL
-                                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                    FilledTonalIconButton(onClick = onNavigateBack, modifier = Modifier.size(48.dp)) {
-                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, Modifier.size(24.dp))
-                                    }
-                                }
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", Modifier.size(22.dp))
+                        }
 
-                                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                    FilledTonalIconButton(onClick = { viewModel.toggleMute() }, modifier = Modifier.size(48.dp)) {
-                                        Icon(if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp, null, Modifier.size(24.dp))
-                                    }
-                                }
+                        // Botón Mute/Unmute
+                        FilledTonalIconButton(
+                            onClick = { viewModel.toggleMute() },
+                            modifier = Modifier.size(if (isLandscape) 48.dp else 44.dp)
+                        ) {
+                            Icon(
+                                if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                                "Volumen",
+                                Modifier.size(22.dp)
+                            )
+                        }
 
-                                Column(
-                                    modifier = Modifier.weight(1.2f),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    Text(
-                                        text = "⏱️ ${String.format("%.1f", currentTime)}s",
-                                        style = MaterialTheme.typography.labelMedium
-                                    )
-                                    FloatingActionButton(
-                                        onClick = {
-                                            viewModel.togglePlay()
-                                            if (isPlaying) partituraWebViewRef.value?.stopAutoScroll()
-                                            else partituraWebViewRef.value?.startAutoScroll(currentTime)
-                                        },
-                                        modifier = Modifier.size(52.dp)
-                                    ) {
-                                        Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(26.dp))
-                                    }
-                                }
-                            } else {
-                                // DISEÑO VERTICAL
-                                Column(
-                                    modifier = Modifier.wrapContentWidth(),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    FilledTonalIconButton(onClick = { viewModel.toggleMute() }, modifier = Modifier.size(40.dp)) {
-                                        Icon(if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp, null, Modifier.size(20.dp))
-                                    }
-                                    FilledTonalIconButton(onClick = onNavigateBack, modifier = Modifier.size(40.dp)) {
-                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, Modifier.size(20.dp))
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.weight(1f))
-
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Text("⏱️ ${String.format("%.1f", currentTime)}s", style = MaterialTheme.typography.bodyMedium)
-                                    FloatingActionButton(
-                                        onClick = {
-                                            viewModel.togglePlay()
-                                            if (isPlaying) partituraWebViewRef.value?.stopAutoScroll()
-                                            else partituraWebViewRef.value?.startAutoScroll(currentTime)
-                                        },
-                                        modifier = Modifier.size(54.dp)
-                                    ) {
-                                        Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, Modifier.size(28.dp))
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.weight(1.3f))
+                        // Timer + Play/Pause
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "⏱️ ${String.format("%.1f", currentTime)}s",
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            FloatingActionButton(
+                                onClick = {
+                                    viewModel.togglePlay()
+                                    if (isPlaying) partituraWebViewRef.value?.stopAutoScroll()
+                                    else partituraWebViewRef.value?.startAutoScroll(currentTime)
+                                },
+                                modifier = Modifier.size(if (isLandscape) 48.dp else 50.dp)
+                            ) {
+                                Icon(
+                                    if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    "Play/Pausa",
+                                    Modifier.size(24.dp)
+                                )
                             }
                         }
                     }
                 }
-
-                // 🔹 YOUTUBE PLAYER — Siempre vivo, overlay dentro del Surface
-                // Posicionado en la esquina inferior-derecha cuando está expandido.
-                // Cuando se colapsa → 1dp invisible pero vivo (no se destruye).
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 8.dp, bottom = 6.dp)
-                        .then(
-                            if (isBottomBarExpanded)
-                                Modifier.width(150.dp).height(84.dp)
-                            else
-                                Modifier.size(1.dp)
-                        )
-                        .clip(RoundedCornerShape(8.dp))
-                ) {
-                    YouTubePlayerSection(
-                        videoId = song.youtubeVideoId,
-                        isPlaying = isPlaying,
-                        isMuted = isMuted,
-                        onTimeUpdate = { seconds ->
-                            viewModel.updateCurrentTime(seconds)
-                            partituraWebViewRef.value?.correctAutoScrollTime(seconds)
-                        },
-                        onDurationUpdate = { duration ->
-                            videoDuration = duration
-                            partituraWebViewRef.value?.evaluateJavascript("if (typeof window.setVideoDuration === 'function') { setVideoDuration($duration); }", null)
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
             }
+        }
+
+        // 🔹 4. YOUTUBE PLAYER — Siempre vivo, INVISIBLE (1dp)
+        // Solo existe para proveer audio y time updates desde YouTube.
+        // No necesita ser visible: la partitura + cursor son la interfaz principal.
+        Box(modifier = Modifier.size(1.dp)) {
+            YouTubePlayerSection(
+                videoId = song.youtubeVideoId,
+                isPlaying = isPlaying,
+                isMuted = isMuted,
+                onTimeUpdate = { seconds ->
+                    viewModel.updateCurrentTime(seconds)
+                    partituraWebViewRef.value?.correctAutoScrollTime(seconds)
+                },
+                onDurationUpdate = { duration ->
+                    videoDuration = duration
+                    partituraWebViewRef.value?.evaluateJavascript("if (typeof window.setVideoDuration === 'function') { setVideoDuration($duration); }", null)
+                },
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }
