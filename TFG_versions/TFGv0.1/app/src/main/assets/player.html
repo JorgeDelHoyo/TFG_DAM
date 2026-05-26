@@ -31,18 +31,29 @@
             background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 8px;
         }
 
-        /* ============================================
-           CURSOR NATIVO DE ALPHATAB — estilo GProTab
-           ============================================ */
+        /* =============================================
+           FORZAR VISIBILIDAD DEL CURSOR NATIVO
+           AlphaTab oculta el cursor cuando no está en
+           estado "playing". Con !important lo forzamos
+           visible para poder moverlo con tickPosition
+           sin necesidad de api.play().
+           ============================================= */
+        .at-cursor-wrapper {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
         .at-cursor-bar {
+            display: block !important;
             background: rgba(255, 242, 0, 0.12) !important;
         }
         .at-cursor-beat {
+            display: block !important;
             background: rgba(220, 0, 0, 0.75) !important;
             width: 3px !important;
         }
         .at-selection div {
-            background: rgba(64, 64, 255, 0.1) !important;
+            background: rgba(64, 64, 255, 0.08) !important;
         }
     </style>
 </head>
@@ -60,13 +71,15 @@
     var hasExternalDuration = false;
     var isPlayerReady = false;
     var pendingTrackIndex = 0;
-    var pendingStartTime = -1;
     var resizeTimer = null;
+    var lastCursorY = -1;
+    var userScrolling = false;
+    var userScrollTimer = null;
 
     function debug(m) { console.log('[ARPEGIO]', m); }
 
     // ============================================================
-    // ALPHATAB CON REPRODUCTOR Y CURSOR NATIVOS
+    // ALPHATAB CON PLAYER + CURSOR NATIVO
     // ============================================================
     var scrollEl = document.getElementById('scroll-container');
 
@@ -93,6 +106,9 @@
         debug('Score: ticks=' + totalTicks + ' dur=' + dur + 's');
         if (!hasExternalDuration) {
             VIDEO_TOTAL_DURATION = dur;
+            debug('Usando duracion del score: ' + VIDEO_TOTAL_DURATION + 's');
+        } else {
+            debug('Usando duracion externa: ' + VIDEO_TOTAL_DURATION + 's');
         }
     });
 
@@ -105,21 +121,28 @@
     });
 
     // ============================================================
-    // REPRODUCTOR LISTO (SoundFont cargado)
-    // Ahora sí podemos mover el cursor con api.tickPosition
+    // PLAYER LISTO (SoundFont cargado, cursor creado)
+    // NO llamamos api.play() — movemos el cursor solo con tickPosition
     // ============================================================
     api.playerReady.on(function() {
         isPlayerReady = true;
-        api.masterVolume = 0;  // SIEMPRE mudo — YouTube da el audio
-        debug('Player LISTO. totalTicks=' + totalTicks + ' VIDEO_DUR=' + VIDEO_TOTAL_DURATION);
-
-        // Si había un startAutoScroll pendiente, ejecutarlo ahora
-        if (pendingStartTime >= 0) {
-            debug('Ejecutando start pendiente: ' + pendingStartTime + 's');
-            doStart(pendingStartTime);
-            pendingStartTime = -1;
-        }
+        api.masterVolume = 0;
+        debug('Player LISTO. Cursor nativo activo.');
+        debug('totalTicks=' + totalTicks + ' VIDEO_DUR=' + VIDEO_TOTAL_DURATION);
     });
+
+    // ============================================================
+    // DETECTAR SCROLL MANUAL DEL USUARIO
+    // ============================================================
+    scrollEl.addEventListener('touchstart', function() {
+        userScrolling = true;
+        clearTimeout(userScrollTimer);
+    }, { passive: true });
+
+    scrollEl.addEventListener('touchend', function() {
+        clearTimeout(userScrollTimer);
+        userScrollTimer = setTimeout(function() { userScrolling = false; }, 4000);
+    }, { passive: true });
 
     // ============================================================
     // RESIZE → re-render
@@ -127,35 +150,38 @@
     window.addEventListener('resize', function() {
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(function() {
-            debug('Resize → re-render');
+            debug('Resize -> re-render');
+            lastCursorY = -1;
             api.render();
         }, 300);
     });
 
     // ============================================================
-    // FUNCIONES INTERNAS
+    // SCROLL MANUAL: mover vista al cursor si cambia de renglón
+    // (AlphaTab solo hace auto-scroll en estado "playing",
+    //  así que lo hacemos nosotros)
     // ============================================================
+    function scrollToCursorIfNeeded() {
+        if (userScrolling) return;
 
-    /** Arranca el player mudo para que el cursor se active */
-    function doStart(resumeTime) {
-        api.masterVolume = 0;
-        api.play();
-        // Pequeño delay para que el player arranque, luego posicionar
-        setTimeout(function() {
-            if (resumeTime > 0) {
-                moveCursorToTime(resumeTime);
+        var beat = document.querySelector('.at-cursor-beat');
+        if (!beat) return;
+
+        var beatTop = beat.offsetTop;
+        // Solo scrollear al cambiar de renglón (salto significativo en Y)
+        if (Math.abs(beatTop - lastCursorY) > 50) {
+            lastCursorY = beatTop;
+            var viewH = scrollEl.clientHeight;
+            var scrollTop = scrollEl.scrollTop;
+
+            // Solo si el cursor sale de la zona visible
+            if (beatTop < scrollTop + 40 || beatTop > scrollTop + viewH - 100) {
+                scrollEl.scrollTo({
+                    top: Math.max(0, beatTop - 80),
+                    behavior: 'smooth'
+                });
             }
-        }, 50);
-    }
-
-    /** Mueve el cursor nativo a un tiempo dado (segundos) */
-    function moveCursorToTime(seconds) {
-        if (!isPlayerReady || totalTicks <= 0 || VIDEO_TOTAL_DURATION <= 0) return;
-        var progress = seconds / VIDEO_TOTAL_DURATION;
-        if (progress < 0) progress = 0;
-        if (progress > 1) progress = 1;
-        var tick = Math.round(progress * totalTicks);
-        api.tickPosition = tick;
+        }
     }
 
     // ============================================================
@@ -164,7 +190,7 @@
 
     function loadSong(fileName, trackIndex, duration) {
         pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
-        pendingStartTime = -1;
+        lastCursorY = -1;
 
         if (duration && Number(duration) > 0) {
             VIDEO_TOTAL_DURATION = Number(duration);
@@ -184,44 +210,38 @@
         api.load(url, [pendingTrackIndex]);
     }
 
-    /** Kotlin llama esto cada frame (~60fps) con el tiempo del vídeo YouTube */
+    /**
+     * Mueve el cursor nativo a la posición correspondiente al tiempo dado.
+     * Llamado ~60fps desde Kotlin con el tiempo del vídeo YouTube.
+     * SIN api.play() → sin reloj interno → sin conflictos.
+     */
     function correctAutoScrollTime(seconds) {
-        moveCursorToTime(seconds);
-    }
+        if (!isPlayerReady || totalTicks <= 0 || VIDEO_TOTAL_DURATION <= 0) return;
 
-    /** Cuando el usuario pulsa play: arrancar player mudo */
-    function startAutoScroll(resumeTime) {
-        var t = Number(resumeTime) || 0;
-        if (isPlayerReady) {
-            doStart(t);
-        } else {
-            // SoundFont aún cargando — encolar para cuando esté listo
-            pendingStartTime = t;
-            debug('Player no listo, encolando start para t=' + t);
-        }
-    }
+        var progress = Math.max(0, Math.min(1, seconds / VIDEO_TOTAL_DURATION));
+        var tick = Math.round(progress * totalTicks);
+        api.tickPosition = tick;
 
-    /** Cuando el usuario pulsa pausa */
-    function stopAutoScroll() {
-        pendingStartTime = -1;
-        if (isPlayerReady) {
-            api.pause();
-        }
+        // Scroll manual (AlphaTab no scrollea sin play())
+        scrollToCursorIfNeeded();
     }
 
     function updateScrollPosition(t) { correctAutoScrollTime(t); }
+    function startAutoScroll(t) { correctAutoScrollTime(Number(t) || 0); }
+    function stopAutoScroll() { /* cursor se queda donde está */ }
 
     function setVideoDuration(duration) {
         if (duration && Number(duration) > 0) {
             VIDEO_TOTAL_DURATION = Number(duration);
             hasExternalDuration = true;
-            debug('Duración externa: ' + VIDEO_TOTAL_DURATION + 's');
+            debug('Duracion externa: ' + VIDEO_TOTAL_DURATION + 's');
         }
     }
 
     function changeTrack(trackIndex) {
         pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
         if (api && api.score && api.score.tracks[pendingTrackIndex]) {
+            lastCursorY = -1;
             api.renderTracks([api.score.tracks[pendingTrackIndex]]);
         }
     }
