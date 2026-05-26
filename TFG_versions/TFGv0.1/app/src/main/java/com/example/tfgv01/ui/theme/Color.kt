@@ -2,30 +2,46 @@ package com.example.tfgv01.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// 🎸 Colores primarios (inspirados en apps de música)
-val Primary = Color(0xFF6200EE)        // Violeta vibrante
-val PrimaryVariant = Color(0xFF3700B3) // Violeta oscuro
-val Secondary = Color(0xFF03DAC6)      // Turquesa
-val SecondaryVariant = Color(0xFF018786)
+// ══════════════════════════════════════════════════════════
+// 🎸 ARPEG.IO — Paleta Lila / Violeta
+//    Basada en el logo oficial (lavanda #B39DDB)
+//    Los tonos lilas favorecen la concentración y creatividad.
+// ══════════════════════════════════════════════════════════
 
-// 🎨 Colores de fondo
-val Background = Color(0xFFFFFBFE)
-val Surface = Color(0xFFFFFBFE)
-val ErrorBackground = Color(0xFFFFFBFE)
+// ── Primarios (lila principal del logo) ──────────────────
+val ArpegPrimary           = Color(0xFFB39DDB) // Lavanda del logo
+val ArpegPrimaryDark       = Color(0xFF9575CD) // Lila medio (para contraste)
+val ArpegPrimaryContainer  = Color(0xFF4A148C) // Violeta profundo (contenedores dark)
+val ArpegOnPrimaryContainer= Color(0xFFEDE7F6) // Texto claro sobre contenedor
 
-// 📝 Colores de texto
-val OnPrimary = Color.White
-val OnSecondary = Color.Black
-val OnBackground = Color(0xFF1C1B1F)
-val OnSurface = Color(0xFF1C1B1F)
-val OnError = Color.White
+// ── Secundarios (acento complementario) ──────────────────
+val ArpegSecondary          = Color(0xFF7E57C2) // Violeta medio
+val ArpegSecondaryContainer = Color(0xFF311B92) // Violeta muy oscuro
+val ArpegOnSecondaryContainer = Color(0xFFD1C4E9) // Lila claro para texto
 
-// 🎵 Colores adicionales para la app
-val MusicNote = Color(0xFF1DB954)      // Verde Spotify
-val AccentOrange = Color(0xFFFF6B35)   // Naranja vibrante
-val AccentYellow = Color(0xFFFFD23F)   // Amarillo
-val DarkBlue = Color(0xFF1A1A2E)       // Azul oscuro
+// ── Terciarios (acento cálido) ───────────────────────────
+val ArpegTertiary           = Color(0xFFCE93D8) // Rosa-lila suave
+val ArpegTertiaryContainer  = Color(0xFF6A1B9A) // Magenta profundo
+val ArpegOnTertiaryContainer= Color(0xFFF3E5F5) // Rosa muy claro
 
-// 🔴 Error
-val Error = Color(0xFFB00020)
-val OnErrorContainer = Color.White
+// ── Fondos (modo oscuro con matiz violeta) ───────────────
+val ArpegDarkBackground   = Color(0xFF0D0A14) // Negro con tinte violeta
+val ArpegDarkSurface      = Color(0xFF1A1525) // Superficie oscura con matiz
+val ArpegDarkSurfaceHigh  = Color(0xFF252030) // Superficie elevada
+
+// ── Fondos (modo claro) ──────────────────────────────────
+val ArpegLightBackground  = Color(0xFFF8F5FF) // Blanco ligeramente lila
+val ArpegLightSurface     = Color(0xFFFFFBFF) // Blanco puro con toque
+
+// ── Texto ────────────────────────────────────────────────
+val ArpegOnDarkSurface    = Color(0xFFEDE7F6) // Texto principal en oscuro (lila blanquecino)
+val ArpegOnLightSurface   = Color(0xFF1C1226) // Texto principal en claro (violeta muy oscuro)
+val ArpegOnPrimary        = Color.White       // Texto sobre botones primarios
+
+// ── Error ────────────────────────────────────────────────
+val ArpegError            = Color(0xFFCF6679) // Rojo rosado (Material estándar dark)
+val ArpegOnError          = Color.Black
+
+// ── Extras ───────────────────────────────────────────────
+val ArpegOutline          = Color(0xFF9E8DB8) // Bordes sutiles con tono lila
+val ArpegOutlineDark      = Color(0xFF4A3F5C) // Bordes en modo oscuro
