@@ -20,10 +20,10 @@
 
         #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; display: none; z-index: 10; background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 8px; }
 
-        /* Ocultamos los cursores nativos bugeados para evitar dobles líneas */
+        /* Ocultamos los cursores nativos de AlphaTab para evitar dobles líneas */
         .at-cursor-beat, .at-selection, .at-cursor { display: none !important; }
 
-        /* 🎯 EL NUEVO CURSOR MAESTRO INMUNE */
+        /* Cursor maestro custom controlado por JS */
         #master-cursor {
             position: absolute;
             background-color: rgba(255, 0, 0, 0.22) !important;
@@ -32,7 +32,7 @@
             pointer-events: none;
             display: none;
             box-sizing: border-box;
-            transition: left 0.15s linear, top 0.2s ease-out; /* Desplazamiento ultra suave */
+            /* La transición se gestiona dinámicamente desde JS */
         }
     </style>
 </head>
@@ -45,58 +45,99 @@
 <div id="loading">Cargando partitura...</div>
 
 <script>
+    // ============================================================
+    // VARIABLES GLOBALES
+    // ============================================================
     var api = null, isInitialized = false, pendingTrackIndex = 0;
-    var totalDuration = 60, totalTicks = 96000;
+    var totalDuration = 60, totalTicks = 960;
     var VIDEO_TOTAL_DURATION = 180;
     var hasExternalDuration = false;
 
     var ultimoRenglonY = -1;
     var masterCursorEl = null;
-    var cajasCompases = []; // Almacenará la geometría de los compases
+    var cajasCompases = []; // Geometría + ticks de cada compás
+    var usandoTicks = false; // Flag: ¿tenemos datos de ticks reales?
 
     function debug(m) {
         console.log('[JS]', m);
     }
 
+    // ============================================================
+    // INICIALIZACIÓN DE ALPHATAB
+    // ============================================================
     api = new alphaTab.AlphaTabApi(document.getElementById('alphaTab'), {
         player: { enablePlayer: false, enableCursor: false },
         core: { fileReadUrl: 'https://appassets.androidplatform.net/assets/', includeNoteBounds: true },
         display: { layout: 'page', scrollMode: 'off' }
     });
 
+    // Evento: partitura cargada en memoria
     if (api.scoreLoaded && api.scoreLoaded.on) {
         api.scoreLoaded.on(function(s) {
             totalDuration = s.duration || 60;
-            totalTicks = s.endTick || 96000;
-            debug('🎵 Partitura cargada. Duración original: ' + totalDuration + 's');
+            totalTicks = s.endTick || 960;
+            debug('🎵 Partitura cargada. Duración: ' + totalDuration + 's, Ticks totales: ' + totalTicks);
             if (!hasExternalDuration) {
                 VIDEO_TOTAL_DURATION = totalDuration;
-                debug('⏱️ Duración de la partitura usada por defecto: ' + VIDEO_TOTAL_DURATION + 's');
+                debug('⏱️ Usando duración de la partitura: ' + VIDEO_TOTAL_DURATION + 's');
             } else {
                 debug('⏱️ Manteniendo duración externa del vídeo: ' + VIDEO_TOTAL_DURATION + 's');
             }
         });
     }
 
+    // Evento: renderizado visual completado (se dispara cada vez que AlphaTab redibuja)
     if (api.renderFinished && api.renderFinished.on) {
         api.renderFinished.on(function() {
             document.getElementById('loading').style.display = 'none';
             masterCursorEl = document.getElementById('master-cursor');
 
-            debug('⏳ Render finalizado. Calculando mapa de compases...');
+            debug('⏳ Render finalizado. Recalculando mapa de compases...');
             setTimeout(function() {
                 mapearCompasesDesdeGeometria();
-            }, 500);
+            }, 400);
         });
     }
 
-    // 📦 RECOLECTOR GEOMÉTRICO DE COMPASES INDESTRUCTIBLE
+    // ============================================================
+    // HANDLER DE RESIZE — CLAVE PARA QUE FUNCIONE EN HORIZONTAL
+    // Cuando la pantalla rota, el ancho del WebView cambia.
+    // AlphaTab no se re-renderiza solo, hay que forzarlo.
+    // ============================================================
+    var resizeTimeout = null;
+    window.addEventListener('resize', function() {
+        if (resizeTimeout) clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(function() {
+            debug('📐 Resize detectado (' + window.innerWidth + 'x' + window.innerHeight + '). Forzando re-render...');
+            if (api && api.score) {
+                isInitialized = false;
+                cajasCompases = [];
+                ultimoRenglonY = -1;
+                if (masterCursorEl) masterCursorEl.style.display = 'none';
+                // Forzar re-render de AlphaTab con las nuevas dimensiones
+                try {
+                    if (typeof api.render === 'function') {
+                        api.render();
+                    } else {
+                        api.renderTracks([api.score.tracks[pendingTrackIndex]]);
+                    }
+                } catch (e) {
+                    debug('⚠️ Error en re-render por resize: ' + e.message);
+                }
+            }
+        }, 300);
+    });
+
+    // ============================================================
+    // MAPEADOR DE COMPASES — Lee geometría visual Y ticks temporales
+    // ============================================================
     function mapearCompasesDesdeGeometria() {
         cajasCompases = [];
         ultimoRenglonY = -1;
+        usandoTicks = false;
 
         if (!api.score || !api.score.masterBars) {
-            debug('❌ Error crítico: Estructura del score ausente.');
+            debug('❌ Error: Estructura del score ausente.');
             return;
         }
 
@@ -106,6 +147,7 @@
                 lookup.staffSystems.forEach(function(system) {
                     if (system.bars) {
                         system.bars.forEach(function(barBounds) {
+                            // Filtrar por el track seleccionado
                             var trackIdx = -1;
                             if (barBounds.bar) {
                                 if (barBounds.bar.track) {
@@ -114,57 +156,90 @@
                                     trackIdx = barBounds.bar.trackIndex;
                                 }
                             }
-                            if (trackIdx === pendingTrackIndex) {
-                                var bounds = barBounds.realBounds || barBounds.visualBounds;
-                                if (bounds && bounds.w > 0 && bounds.h > 0) {
-                                    cajasCompases.push({
-                                        index: barBounds.bar.index,
-                                        x: bounds.x,
-                                        y: bounds.y,
-                                        w: bounds.w,
-                                        h: bounds.h
-                                    });
+                            if (trackIdx !== pendingTrackIndex) return;
+
+                            var bounds = barBounds.realBounds || barBounds.visualBounds;
+                            if (!bounds || bounds.w <= 0 || bounds.h <= 0) return;
+
+                            // Obtener info temporal del MasterBar correspondiente
+                            var barIndex = barBounds.bar.index;
+                            var masterBar = null;
+                            try {
+                                if (barBounds.bar.masterBar) {
+                                    masterBar = barBounds.bar.masterBar;
+                                } else if (api.score.masterBars[barIndex]) {
+                                    masterBar = api.score.masterBars[barIndex];
+                                }
+                            } catch (e) { /* Silenciar si no accesible */ }
+
+                            var startTick = 0;
+                            var durTick = 0;
+                            if (masterBar) {
+                                startTick = masterBar.start || 0;
+                                // calculatedDuration puede ser propiedad o método según versión
+                                if (typeof masterBar.calculatedDuration !== 'undefined') {
+                                    durTick = masterBar.calculatedDuration;
+                                } else if (typeof masterBar.calculateDuration === 'function') {
+                                    durTick = masterBar.calculateDuration();
                                 }
                             }
+
+                            cajasCompases.push({
+                                index: barIndex,
+                                x: bounds.x,
+                                y: bounds.y,
+                                w: bounds.w,
+                                h: bounds.h,
+                                startTick: startTick,
+                                endTick: startTick + durTick
+                            });
                         });
                     }
                 });
             }
 
-            // Ordenar por el índice del compás real
+            // Ordenar por índice del compás
             cajasCompases.sort(function(a, b) { return a.index - b.index; });
 
             if (cajasCompases.length > 0) {
-                isInitialized = true;
-                debug('📦 ¡Mapa de compases completado! Detectados: ' + cajasCompases.length);
-            } else {
-                // Plan B de emergencia
-                var svgBars = document.querySelectorAll('.at-bar, svg g');
-                if(svgBars.length > 0) {
-                    var totalH = document.getElementById('alphaTab').clientHeight || 600;
-                    var numBars = Math.max(3, api.score.masterBars.length);
-                    var altoIndividual = totalH / numBars;
-                    for(var k = 0; k < numBars; k++) {
-                        cajasCompases.push({
-                            index: k,
-                            x: 0,
-                            y: k * altoIndividual,
-                            w: document.getElementById('alphaTab').clientWidth || 360,
-                            h: altoIndividual
-                        });
-                    }
-                    isInitialized = true;
-                    debug('📦 Modo Adaptativo por Bloques Activo.');
-                } else {
-                    setTimeout(mapearCompasesDesdeGeometria, 400);
+                // Comprobar si tenemos datos de ticks reales
+                var lastCompas = cajasCompases[cajasCompases.length - 1];
+                if (lastCompas.endTick > 0) {
+                    usandoTicks = true;
+                    totalTicks = lastCompas.endTick;
                 }
+                isInitialized = true;
+                debug('📦 Mapa completado: ' + cajasCompases.length + ' compases | Ticks: ' + (usandoTicks ? 'SÍ (' + totalTicks + ')' : 'NO (fallback uniforme)'));
+            } else {
+                // Plan B: Estimación por bloques si boundsLookup no funciona
+                var atEl = document.getElementById('alphaTab');
+                var numBars = Math.max(3, api.score.masterBars.length);
+                var totalH = atEl ? atEl.clientHeight : 600;
+                var totalW = atEl ? atEl.clientWidth : 360;
+                var altoIndividual = totalH / numBars;
+
+                for (var k = 0; k < numBars; k++) {
+                    cajasCompases.push({
+                        index: k,
+                        x: 0,
+                        y: k * altoIndividual,
+                        w: totalW,
+                        h: altoIndividual,
+                        startTick: 0,
+                        endTick: 0
+                    });
+                }
+                isInitialized = true;
+                debug('📦 Plan B activo: ' + numBars + ' bloques estimados.');
             }
         } catch (e) {
             debug('❌ Fallo en mapeo de compases: ' + e.message);
         }
     }
 
-    // 🔄 RECEPTOR DE SINCRONIZACIÓN POR COMPÁS Y SALTO SECO
+    // ============================================================
+    // SINCRONIZACIÓN DEL CURSOR — Posiciona el cursor según los segundos
+    // ============================================================
     function sincronizarConVideo(seconds) {
         if (!isInitialized || cajasCompases.length === 0 || !masterCursorEl) return;
 
@@ -172,46 +247,74 @@
         if (progressPercent > 1) progressPercent = 1;
         if (progressPercent < 0) progressPercent = 0;
 
-        var duracionPorCompas = VIDEO_TOTAL_DURATION / cajasCompases.length;
-        var indexCompasActual = Math.floor(seconds / duracionPorCompas);
-        if (indexCompasActual >= cajasCompases.length) indexCompasActual = cajasCompases.length - 1;
-        if (indexCompasActual < 0) indexCompasActual = 0;
+        var indexCompasActual = 0;
+        var progresoInternoCompas = 0;
 
-        var compas = cajasCompases[indexCompasActual];
+        if (usandoTicks && totalTicks > 0) {
+            // ✅ MAPEO POR TICKS REALES — Preciso con cambios de tempo
+            var currentTick = progressPercent * totalTicks;
 
-        var tiempoInicioCompas = indexCompasActual * duracionPorCompas;
-        var progresoInternoCompas = (seconds - tiempoInicioCompas) / duracionPorCompas;
+            // Búsqueda binaria del compás que contiene este tick
+            var lo = 0, hi = cajasCompases.length - 1;
+            while (lo <= hi) {
+                var mid = Math.floor((lo + hi) / 2);
+                if (cajasCompases[mid].startTick <= currentTick) {
+                    indexCompasActual = mid;
+                    lo = mid + 1;
+                } else {
+                    hi = mid - 1;
+                }
+            }
+
+            var compas = cajasCompases[indexCompasActual];
+            var tickRange = compas.endTick - compas.startTick;
+            if (tickRange > 0) {
+                progresoInternoCompas = (currentTick - compas.startTick) / tickRange;
+            }
+        } else {
+            // Fallback: distribución uniforme (menos preciso pero funcional)
+            var duracionPorCompas = VIDEO_TOTAL_DURATION / cajasCompases.length;
+            indexCompasActual = Math.floor(seconds / duracionPorCompas);
+            if (indexCompasActual >= cajasCompases.length) indexCompasActual = cajasCompases.length - 1;
+            if (indexCompasActual < 0) indexCompasActual = 0;
+
+            var tiempoInicioCompas = indexCompasActual * duracionPorCompas;
+            progresoInternoCompas = (seconds - tiempoInicioCompas) / duracionPorCompas;
+        }
+
+        // Clamp del progreso dentro del compás
         if (progresoInternoCompas > 1) progresoInternoCompas = 1;
         if (progresoInternoCompas < 0) progresoInternoCompas = 0;
 
+        var compas = cajasCompases[indexCompasActual];
         var cursorX = compas.x + (progresoInternoCompas * compas.w);
         var anchoCursorNota = 24;
 
         masterCursorEl.style.display = 'block';
 
         if (compas.y !== ultimoRenglonY) {
+            // Salto de renglón: reposicionar sin transición para evitar barridos diagonales
             masterCursorEl.style.transition = 'none';
             masterCursorEl.style.left = cursorX + 'px';
             masterCursorEl.style.top = (compas.y + 4) + 'px';
             masterCursorEl.style.width = anchoCursorNota + 'px';
             masterCursorEl.style.height = (compas.h - 8) + 'px';
 
-            void masterCursorEl.offsetWidth;
+            void masterCursorEl.offsetWidth; // Forzar reflow del navegador
 
-            masterCursorEl.style.transition = 'left 0.2s linear, width 0.2s ease, height 0.2s ease';
+            masterCursorEl.style.transition = 'left 0.15s linear';
 
             ultimoRenglonY = compas.y;
+
+            // Auto-scroll suave para mantener el compás visible
             var container = document.getElementById('scroll-container');
             if (container) {
                 var targetScroll = compas.y - (container.clientHeight * 0.15);
                 if (targetScroll < 0) targetScroll = 0;
-
-                container.scrollTo({
-                    top: targetScroll,
-                    behavior: 'smooth'
-                });
+                container.scrollTo({ top: targetScroll, behavior: 'smooth' });
             }
         } else {
+            // Mismo renglón: desplazamiento suave horizontal
             masterCursorEl.style.left = cursorX + 'px';
             masterCursorEl.style.top = (compas.y + 4) + 'px';
             masterCursorEl.style.width = anchoCursorNota + 'px';
@@ -219,7 +322,9 @@
         }
     }
 
-    // 🎛️ COUPLING ANDROID / KOTLIN
+    // ============================================================
+    // API PÚBLICA — Llamadas desde Kotlin (Android Bridge)
+    // ============================================================
     function correctAutoScrollTime(time) { sincronizarConVideo(time); }
     function updateScrollPosition(time) { sincronizarConVideo(time); }
     function startAutoScroll(resumeTime) { sincronizarConVideo(resumeTime); }
@@ -229,6 +334,7 @@
         if (duration && Number(duration) > 0) {
             VIDEO_TOTAL_DURATION = Number(duration);
             hasExternalDuration = true;
+            debug('⏱️ Duración externa recibida: ' + VIDEO_TOTAL_DURATION + 's');
         }
     }
 
@@ -242,6 +348,8 @@
         }
         document.getElementById('loading').style.display = 'block';
         isInitialized = false;
+        usandoTicks = false;
+        cajasCompases = [];
         if (masterCursorEl) masterCursorEl.style.display = 'none';
         api.load(fileName.startsWith('http') ? fileName : 'https://appassets.androidplatform.net/assets/' + fileName.replace(/^\/+/, ''), [pendingTrackIndex]);
     }
@@ -250,6 +358,8 @@
         pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
         if (api && api.score) {
             isInitialized = false;
+            usandoTicks = false;
+            cajasCompases = [];
             if (masterCursorEl) masterCursorEl.style.display = 'none';
             api.renderTracks([api.score.tracks[pendingTrackIndex]]);
         }
