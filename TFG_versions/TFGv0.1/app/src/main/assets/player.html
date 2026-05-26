@@ -196,9 +196,8 @@
     });
 
     // ============================================================
-    // SCROLL MANUAL: mover vista al cursor si cambia de renglón
-    // (AlphaTab solo hace auto-scroll en estado "playing",
-    //  así que lo hacemos nosotros)
+    // AUTO-SCROLL: mantener el cursor visible en pantalla
+    // Usa getBoundingClientRect() para posición real en viewport
     // ============================================================
     function scrollToCursorIfNeeded() {
         if (userScrolling) return;
@@ -206,20 +205,19 @@
         var beat = document.querySelector('.at-cursor-beat');
         if (!beat) return;
 
-        var beatTop = beat.offsetTop;
-        // Solo scrollear al cambiar de renglón (salto significativo en Y)
-        if (Math.abs(beatTop - lastCursorY) > 50) {
-            lastCursorY = beatTop;
-            var viewH = scrollEl.clientHeight;
-            var scrollTop = scrollEl.scrollTop;
+        var rect = beat.getBoundingClientRect();
+        var containerRect = scrollEl.getBoundingClientRect();
+        var cursorRelativeTop = rect.top - containerRect.top;
+        var viewH = containerRect.height;
 
-            // Solo si el cursor sale de la zona visible
-            if (beatTop < scrollTop + 40 || beatTop > scrollTop + viewH - 100) {
-                scrollEl.scrollTo({
-                    top: Math.max(0, beatTop - 80),
-                    behavior: 'smooth'
-                });
-            }
+        // Si el cursor está en el 30% inferior o por encima de la vista → scrollear
+        if (cursorRelativeTop > viewH * 0.65 || cursorRelativeTop < 0) {
+            // Calcular posición absoluta del cursor en el contenido
+            var absoluteTop = scrollEl.scrollTop + cursorRelativeTop;
+            scrollEl.scrollTo({
+                top: Math.max(0, absoluteTop - viewH * 0.2),
+                behavior: 'smooth'
+            });
         }
     }
 

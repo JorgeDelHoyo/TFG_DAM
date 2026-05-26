@@ -140,32 +140,28 @@ fun PlayerScreen(
             Column(modifier = Modifier.fillMaxSize()) {
 
                 // Tirador / Botón de control de despliegue (Siempre visible)
-                Box(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
                         .clickable { isBottomBarExpanded = !isBottomBarExpanded }
                         .padding(horizontal = 16.dp),
-                    contentAlignment = Alignment.Center
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = if (isBottomBarExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                            contentDescription = "Expandir/Contraer",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isBottomBarExpanded) "Cerrar controles" else "Mostrar controles",
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                    }
+                    Icon(
+                        imageVector = if (isBottomBarExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                        contentDescription = "Expandir/Contraer",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isBottomBarExpanded) "Cerrar controles" else "Mostrar controles",
+                        style = MaterialTheme.typography.labelLarge
+                    )
                 }
 
-                // Contenido expandido (Solo se ve cuando isBottomBarExpanded es true)
+                // Contenido expandido
                 AnimatedVisibility(
                     visible = isBottomBarExpanded,
                     enter = fadeIn() + expandVertically(),
@@ -178,23 +174,19 @@ fun PlayerScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (isLandscape) {
-                            // 🛠️ DISEÑO HORIZONTAL MEJORADO (Volver a la izquierda del todo + Botones más grandes)
-
-                            // Botón 1: Volver (Izquierda del todo)
+                            // DISEÑO HORIZONTAL
                             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                                 FilledTonalIconButton(onClick = onNavigateBack, modifier = Modifier.size(48.dp)) {
                                     Icon(Icons.AutoMirrored.Filled.ArrowBack, null, Modifier.size(24.dp))
                                 }
                             }
 
-                            // Botón 2: Mute (En el centro del bloque de botones)
                             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                                 FilledTonalIconButton(onClick = { viewModel.toggleMute() }, modifier = Modifier.size(48.dp)) {
                                     Icon(if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp, null, Modifier.size(24.dp))
                                 }
                             }
 
-                            // Botón 3: Segundos arriba + Botón Play abajo
                             Column(
                                 modifier = Modifier.weight(1.2f),
                                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -216,8 +208,7 @@ fun PlayerScreen(
                                 }
                             }
                         } else {
-                            // 📱 DISEÑO ORIGINAL ESPACIADO PARA MODO VERTICAL
-                            // BLOQUE 1 (IZQUIERDA)
+                            // DISEÑO VERTICAL
                             Column(
                                 modifier = Modifier.wrapContentWidth(),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -233,7 +224,6 @@ fun PlayerScreen(
 
                             Spacer(modifier = Modifier.weight(1f))
 
-                            // BLOQUE 2 VERTICAL (CENTRO)
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -253,25 +243,35 @@ fun PlayerScreen(
 
                             Spacer(modifier = Modifier.weight(1.3f))
                         }
-
-                        // BLOQUE 3 (DERECHA) - El reproductor se ancla al final manteniendo sus proporciones estables
-                        YouTubePlayerSection(
-                            videoId = song.youtubeVideoId,
-                            isPlaying = isPlaying,
-                            isMuted = isMuted,
-                            onTimeUpdate = { seconds ->
-                                viewModel.updateCurrentTime(seconds)
-                                partituraWebViewRef.value?.correctAutoScrollTime(seconds)
-                            },
-                            onDurationUpdate = { duration ->
-                                videoDuration = duration
-                                partituraWebViewRef.value?.evaluateJavascript("if (typeof window.setVideoDuration === 'function') { setVideoDuration($duration); }", null)
-                            },
-                            modifier = Modifier.width(160.dp).height(90.dp)
-                        )
                     }
                 }
             }
+        }
+
+        // 🔹 4. YOUTUBE PLAYER — SIEMPRE VIVO, fuera del panel colapsable
+        // Se mantiene en un Box de 0dp cuando los controles están cerrados
+        // para que no se destruya/recree al abrir/cerrar controles
+        Box(
+            modifier = Modifier
+                .then(
+                    if (isBottomBarExpanded) Modifier.width(160.dp).height(90.dp)
+                    else Modifier.size(1.dp) // Mínimo visible para mantenerlo vivo
+                )
+        ) {
+            YouTubePlayerSection(
+                videoId = song.youtubeVideoId,
+                isPlaying = isPlaying,
+                isMuted = isMuted,
+                onTimeUpdate = { seconds ->
+                    viewModel.updateCurrentTime(seconds)
+                    partituraWebViewRef.value?.correctAutoScrollTime(seconds)
+                },
+                onDurationUpdate = { duration ->
+                    videoDuration = duration
+                    partituraWebViewRef.value?.evaluateJavascript("if (typeof window.setVideoDuration === 'function') { setVideoDuration($duration); }", null)
+                },
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }
