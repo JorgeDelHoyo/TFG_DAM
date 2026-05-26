@@ -7,65 +7,66 @@
     <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.3.0/dist/alphaTab.js"></script>
     <style>
         * { box-sizing: border-box; }
-        body { margin: 0; padding: 0; background-color: #ffffff; overflow: hidden; }
+        body { margin: 0; padding: 0; background: #fff; overflow: hidden; }
 
-        /* Contenedor principal con scroll — AlphaTab lo controla para el auto-scroll del cursor */
         .at-container {
             height: 100vh;
             overflow-y: auto !important;
             overflow-x: hidden !important;
             position: relative;
-            background-color: #ffffff !important;
             -webkit-overflow-scrolling: touch;
         }
 
         #alphaTab {
             width: 100% !important;
-            background: #ffffff;
             position: relative;
             padding-bottom: 300px;
         }
 
         #loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
+            position: fixed; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            color: white;
-            font-size: 18px;
+            color: #fff; font-size: 18px; display: none; z-index: 10;
+            background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 8px;
+        }
+
+        /* =============================================
+           CURSOR CUSTOM A NIVEL DE BEAT
+           Mismo aspecto visual que GProTab.net
+           ============================================= */
+
+        /* Barra resaltada del compás actual */
+        #cursor-bar {
+            position: absolute;
+            z-index: 100;
+            background: rgba(255, 242, 0, 0.15);
+            pointer-events: none;
             display: none;
-            z-index: 10;
-            background: rgba(0,0,0,0.7);
-            padding: 12px 24px;
-            border-radius: 8px;
+            transition: left 0.06s linear, top 0s;
         }
 
-        /* ============================================
-           CURSOR NATIVO DE ALPHATAB (igual que GProTab.net)
-           ============================================ */
-
-        /* Barra de compás actual — fondo amarillo sutil */
-        .at-cursor-bar {
-            background: rgba(255, 242, 0, 0.12) !important;
+        /* Línea vertical roja en el beat actual */
+        #cursor-beat {
+            position: absolute;
+            z-index: 101;
+            width: 3px;
+            background: rgba(220, 0, 0, 0.75);
+            pointer-events: none;
+            display: none;
+            transition: left 0.08s linear, top 0s;
         }
 
-        /* Cursor de beat — línea roja vertical que avanza por cada nota */
-        .at-cursor-beat {
-            background: rgba(220, 0, 0, 0.7) !important;
-            width: 3px !important;
-        }
-
-        /* Selección de notas */
-        .at-selection div {
-            background: rgba(64, 64, 255, 0.08) !important;
-        }
+        /* Ocultar cursores nativos de AlphaTab (usamos los nuestros) */
+        .at-cursor-bar, .at-cursor-beat, .at-selection { display: none !important; }
     </style>
 </head>
 <body>
 
-<!-- Contenedor con scroll que AlphaTab controlará para seguir al cursor -->
 <div class="at-container" id="scroll-container">
-    <div id="alphaTab"></div>
+    <div id="alphaTab">
+        <div id="cursor-bar"></div>
+        <div id="cursor-beat"></div>
+    </div>
 </div>
 <div id="loading">Cargando partitura...</div>
 
@@ -75,94 +76,201 @@
     // ============================================================
     var api = null;
     var totalTicks = 0;
-    var scoreDurationMs = 0;
     var VIDEO_TOTAL_DURATION = 180;
     var hasExternalDuration = false;
-    var isPlayerReady = false;
-    var pendingTrackIndex = 0;
+    var beatMap = [];       // Array plano de beats ordenados por tick
+    var currentRow = -1;    // Fila/sistema actual del cursor
+    var container = null;
+    var cursorBar = null;
+    var cursorBeat = null;
+    var resizeTimer = null;
 
-    function debug(m) { console.log('[JS]', m); }
+    function debug(m) { console.log('[ARPEGIO]', m); }
 
     // ============================================================
-    // INICIALIZACIÓN DE ALPHATAB CON REPRODUCTOR Y CURSOR NATIVOS
-    // (Mismo enfoque que GProTab.net / Songsterr)
+    // REFERENCIAS DOM
     // ============================================================
-    var scrollContainer = document.getElementById('scroll-container');
+    container = document.getElementById('scroll-container');
+    cursorBar = document.getElementById('cursor-bar');
+    cursorBeat = document.getElementById('cursor-beat');
 
+    // ============================================================
+    // INICIALIZACIÓN DE ALPHATAB (sin reproductor, solo renderizado)
+    // ============================================================
     api = new alphaTab.AlphaTabApi(document.getElementById('alphaTab'), {
-        player: {
-            enablePlayer: true,
-            enableCursor: true,
-            scrollElement: scrollContainer,
-            soundFont: 'https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.3.0/dist/soundfont/sonivox.sf2'
-        },
         core: {
             fileReadUrl: 'https://appassets.androidplatform.net/assets/',
             includeNoteBounds: true
         },
         display: {
-            layoutMode: 1 // Page layout
+            layoutMode: 1  // Page layout
         }
     });
 
     // ============================================================
-    // EVENTO: Partitura cargada en memoria
+    // EVENTO: Score cargado
     // ============================================================
     api.scoreLoaded.on(function(score) {
         totalTicks = score.endTick || 0;
-        scoreDurationMs = (score.duration || 60) * 1000;
-
-        debug('🎵 Score cargado. Ticks: ' + totalTicks + ', Duración: ' + (scoreDurationMs/1000) + 's');
+        var durationSec = score.duration || 60;
+        debug('Score cargado. Ticks=' + totalTicks + ' Dur=' + durationSec + 's');
 
         if (!hasExternalDuration) {
-            VIDEO_TOTAL_DURATION = scoreDurationMs / 1000;
-            debug('⏱️ Usando duración del score: ' + VIDEO_TOTAL_DURATION + 's');
+            VIDEO_TOTAL_DURATION = durationSec;
         }
-
-        // Informar a Kotlin de la duración real
-        try {
-            if (typeof Android !== 'undefined' && Android.onDurationReady) {
-                Android.onDurationReady(scoreDurationMs / 1000);
-            }
-        } catch(e) {}
     });
 
     // ============================================================
-    // EVENTO: Renderizado visual completado
+    // EVENTO: Render terminado → construir mapa de beats
     // ============================================================
     api.renderFinished.on(function() {
         document.getElementById('loading').style.display = 'none';
-        debug('✅ Render completado.');
+        buildBeatMap();
+        debug('Render OK. Beats mapeados: ' + beatMap.length);
     });
 
     // ============================================================
-    // EVENTO: Reproductor listo (SoundFont cargado)
+    // Re-render al rotar la pantalla (con debounce)
     // ============================================================
-    api.playerReady.on(function() {
-        isPlayerReady = true;
-        // Mutear por defecto — para canciones YouTube no queremos doble audio.
-        // Para locales, Kotlin llamará a unmute().
-        api.masterVolume = 0;
-        debug('🔊 Player listo (SoundFont cargado). Cursor nativo activo.');
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            debug('Resize → re-render');
+            currentRow = -1;
+            api.render();
+        }, 300);
     });
 
     // ============================================================
-    // EVENTO: Posición del reproductor cambia (para debug / futuro uso)
+    // CONSTRUIR MAPA DE BEATS desde boundsLookup
+    // Cada entrada: { beatX, barX, barY, barW, barH, tick, row }
     // ============================================================
-    api.playerPositionChanged.on(function(e) {
-        // e.currentTick, e.endTick, e.currentTime (ms), e.endTime (ms)
-    });
+    function buildBeatMap() {
+        beatMap = [];
+        var lookup = api.renderer.boundsLookup;
+        if (!lookup) { debug('⚠ Sin boundsLookup'); return; }
+
+        var groups = lookup.staveGroups;
+        if (!groups) { debug('⚠ Sin staveGroups'); return; }
+
+        for (var si = 0; si < groups.length; si++) {
+            var group = groups[si];
+            if (!group.bars) continue;
+
+            for (var ri = 0; ri < group.bars.length; ri++) {
+                var masterBar = group.bars[ri];
+                if (!masterBar.bars || masterBar.bars.length === 0) continue;
+
+                // Bounds del compás completo (para el highlight amarillo)
+                var mVis = masterBar.visualBounds;
+                var mReal = masterBar.realBounds;
+
+                // Usamos la primera staff (guitarra principal)
+                var staff = masterBar.bars[0];
+                if (!staff || !staff.beats) continue;
+
+                for (var bei = 0; bei < staff.beats.length; bei++) {
+                    var bb = staff.beats[bei];
+                    var beat = bb.beat;
+                    var bVis = bb.visualBounds;
+
+                    // Obtener tick absoluto del beat
+                    var tick = 0;
+                    if (beat) {
+                        if (typeof beat.playbackStart !== 'undefined') tick = beat.playbackStart;
+                        else if (typeof beat.absoluteStart !== 'undefined') tick = beat.absoluteStart;
+                    }
+
+                    beatMap.push({
+                        beatX: bVis ? bVis.x : 0,
+                        barX:  mVis ? mVis.x : 0,
+                        barY:  mReal ? mReal.y : (mVis ? mVis.y : 0),
+                        barW:  mVis ? mVis.w : 0,
+                        barH:  mReal ? mReal.h : (mVis ? mVis.h : 0),
+                        tick:  tick,
+                        row:   si
+                    });
+                }
+            }
+        }
+
+        // Ordenar por tick ascendente
+        beatMap.sort(function(a, b) { return a.tick - b.tick; });
+
+        // Si no pudimos obtener ticks (todos son 0), distribuir uniformemente
+        if (beatMap.length > 1 && beatMap[beatMap.length - 1].tick === 0) {
+            debug('⚠ Ticks no disponibles, distribuyendo uniformemente');
+            for (var i = 0; i < beatMap.length; i++) {
+                beatMap[i].tick = Math.round((i / beatMap.length) * totalTicks);
+            }
+        }
+    }
 
     // ============================================================
-    // API PÚBLICA — Llamadas desde Kotlin (Android Bridge)
+    // BÚSQUEDA BINARIA: encontrar el beat en un tick dado
+    // ============================================================
+    function findBeatAtTick(tick) {
+        if (beatMap.length === 0) return null;
+        var lo = 0, hi = beatMap.length - 1;
+        while (lo <= hi) {
+            var mid = (lo + hi) >> 1;
+            if (beatMap[mid].tick <= tick) lo = mid + 1;
+            else hi = mid - 1;
+        }
+        return hi >= 0 ? beatMap[hi] : beatMap[0];
+    }
+
+    // ============================================================
+    // POSICIONAR CURSOR en un beat dado
+    // ============================================================
+    function positionCursor(beat) {
+        if (!beat) return;
+
+        // Línea roja vertical del beat
+        cursorBeat.style.display = 'block';
+        cursorBeat.style.left   = beat.beatX + 'px';
+        cursorBeat.style.top    = beat.barY + 'px';
+        cursorBeat.style.height = beat.barH + 'px';
+
+        // Fondo amarillo del compás
+        cursorBar.style.display = 'block';
+        cursorBar.style.left   = beat.barX + 'px';
+        cursorBar.style.top    = beat.barY + 'px';
+        cursorBar.style.width  = beat.barW + 'px';
+        cursorBar.style.height = beat.barH + 'px';
+
+        // Auto-scroll SOLO al cambiar de línea/sistema
+        if (beat.row !== currentRow) {
+            currentRow = beat.row;
+            var scrollTop = container.scrollTop;
+            var viewH = container.clientHeight;
+            var cursorTop = beat.barY;
+
+            // Solo scrollear si el cursor queda fuera de la zona visible
+            if (cursorTop < scrollTop + 40 || cursorTop + beat.barH > scrollTop + viewH - 40) {
+                container.scrollTo({
+                    top: Math.max(0, cursorTop - 80),
+                    behavior: 'smooth'
+                });
+            }
+        }
+    }
+
+    // ============================================================
+    // API PÚBLICA — Llamadas desde Kotlin
     // ============================================================
 
-    /**
-     * Carga una canción. Si duration > 0, es una canción con YouTube (sync externo).
-     * Si duration = 0 o no se pasa, es una canción local (AlphaTab maneja todo).
-     */
+    /** Sincroniza el cursor con el tiempo de reproducción (YouTube o metrónomo) */
+    function correctAutoScrollTime(seconds) {
+        if (beatMap.length === 0 || totalTicks <= 0 || VIDEO_TOTAL_DURATION <= 0) return;
+        var progress = Math.max(0, Math.min(1, seconds / VIDEO_TOTAL_DURATION));
+        var tick = Math.round(progress * totalTicks);
+        positionCursor(findBeatAtTick(tick));
+    }
+
+    /** Carga una canción */
     function loadSong(fileName, trackIndex, duration) {
-        pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
+        var ti = Math.max(0, Number(trackIndex) || 0);
 
         if (duration && Number(duration) > 0) {
             VIDEO_TOTAL_DURATION = Number(duration);
@@ -171,100 +279,47 @@
             hasExternalDuration = false;
         }
 
+        beatMap = [];
+        currentRow = -1;
+        cursorBar.style.display = 'none';
+        cursorBeat.style.display = 'none';
         document.getElementById('loading').style.display = 'block';
-        isPlayerReady = false;
 
         var url = fileName.startsWith('http')
             ? fileName
             : 'https://appassets.androidplatform.net/assets/' + fileName.replace(/^\/+/, '');
 
-        debug('📂 Cargando: ' + url + ', track: ' + pendingTrackIndex);
-        api.load(url, [pendingTrackIndex]);
+        debug('Cargando: ' + url + ' track=' + ti + ' dur=' + VIDEO_TOTAL_DURATION);
+        api.load(url, [ti]);
     }
 
-    /**
-     * FUNCIÓN CLAVE: Sincroniza el cursor nativo de AlphaTab con el tiempo del vídeo YouTube.
-     * Convierte segundos → ticks y usa api.tickPosition para mover el cursor.
-     * El cursor nativo de AlphaTab se mueve a nivel de BEAT (no de compás), igual que GProTab.net.
-     */
-    function correctAutoScrollTime(seconds) {
-        if (!isPlayerReady || totalTicks <= 0 || VIDEO_TOTAL_DURATION <= 0) return;
+    /** Aliases para compatibilidad */
+    function updateScrollPosition(t) { correctAutoScrollTime(t); }
+    function startAutoScroll(t)      { correctAutoScrollTime(t); }
+    function stopAutoScroll()         { /* cursor se queda donde está */ }
 
-        var progress = seconds / VIDEO_TOTAL_DURATION;
-        if (progress < 0) progress = 0;
-        if (progress > 1) progress = 1;
-
-        var tick = Math.round(progress * totalTicks);
-        api.tickPosition = tick;
-    }
-
-    /** Alias para compatibilidad con las llamadas existentes desde Kotlin */
-    function updateScrollPosition(time) { correctAutoScrollTime(time); }
-    function startAutoScroll(resumeTime) { correctAutoScrollTime(resumeTime); }
-    function stopAutoScroll() { /* El cursor se queda donde está */ }
-
-    /** Establece la duración total del vídeo de YouTube */
-    function setVideoDuration(duration) {
-        if (duration && Number(duration) > 0) {
-            VIDEO_TOTAL_DURATION = Number(duration);
+    /** Establece la duración del vídeo YouTube */
+    function setVideoDuration(d) {
+        if (d && Number(d) > 0) {
+            VIDEO_TOTAL_DURATION = Number(d);
             hasExternalDuration = true;
-            debug('⏱️ Duración externa recibida: ' + VIDEO_TOTAL_DURATION + 's');
+            debug('Duración externa: ' + VIDEO_TOTAL_DURATION + 's');
         }
     }
 
-    /** Cambia la pista/instrumento visible */
+    /** Cambia de pista/instrumento */
     function changeTrack(trackIndex) {
-        pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
-        if (api && api.score && api.score.tracks[pendingTrackIndex]) {
-            api.renderTracks([api.score.tracks[pendingTrackIndex]]);
+        var ti = Math.max(0, Number(trackIndex) || 0);
+        if (api && api.score && api.score.tracks[ti]) {
+            currentRow = -1;
+            cursorBar.style.display = 'none';
+            cursorBeat.style.display = 'none';
+            api.renderTracks([api.score.tracks[ti]]);
         }
     }
 
-    // ============================================================
-    // CONTROLES DE REPRODUCCIÓN LOCAL (para canciones .gp3 sin YouTube)
-    // AlphaTab reproduce el audio del Guitar Pro → cursor + sonido
-    // ============================================================
-
-    /** Inicia la reproducción nativa de AlphaTab (audio del .gp3) */
-    function playLocal() {
-        if (isPlayerReady) {
-            api.masterVolume = 1.0;
-            api.play();
-            debug('▶️ Reproducción local iniciada');
-        }
-    }
-
-    /** Pausa la reproducción nativa */
-    function pauseLocal() {
-        if (isPlayerReady) {
-            api.pause();
-            debug('⏸️ Reproducción local pausada');
-        }
-    }
-
-    /** Cambia la velocidad de reproducción (0.25 a 2.0) */
-    function setPlaybackSpeed(speed) {
-        var s = Number(speed) || 1.0;
-        if (s < 0.25) s = 0.25;
-        if (s > 2.0) s = 2.0;
-        if (isPlayerReady) {
-            api.playbackSpeed = s;
-            debug('⚡ Velocidad: ' + s + 'x');
-        }
-    }
-
-    /** Desmutea el audio de AlphaTab (para canciones locales) */
-    function unmute() {
-        if (api) api.masterVolume = 1.0;
-    }
-
-    /** Mutea el audio de AlphaTab (para canciones YouTube donde no queremos doble audio) */
-    function mute() {
-        if (api) api.masterVolume = 0;
-    }
-
-    /** Verifica si el reproductor está listo */
-    function isReady() { return isPlayerReady; }
+    /** ¿Está listo? */
+    function isReady() { return beatMap.length > 0; }
 </script>
 </body>
 </html>
