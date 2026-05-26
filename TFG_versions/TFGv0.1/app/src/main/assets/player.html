@@ -6,41 +6,66 @@
     <title>Arpegio Player</title>
     <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.3.0/dist/alphaTab.js"></script>
     <style>
+        * { box-sizing: border-box; }
         body { margin: 0; padding: 0; background-color: #ffffff; overflow: hidden; }
 
+        /* Contenedor principal con scroll — AlphaTab lo controla para el auto-scroll del cursor */
         .at-container {
             height: 100vh;
-            overflow-y: scroll !important;
+            overflow-y: auto !important;
             overflow-x: hidden !important;
             position: relative;
             background-color: #ffffff !important;
             -webkit-overflow-scrolling: touch;
         }
-        #alphaTab { width: 100% !important; background: #ffffff; position: relative; padding-bottom: 500px; }
 
-        #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 18px; display: none; z-index: 10; background: rgba(0,0,0,0.7); padding: 12px 24px; border-radius: 8px; }
+        #alphaTab {
+            width: 100% !important;
+            background: #ffffff;
+            position: relative;
+            padding-bottom: 300px;
+        }
 
-        /* Ocultamos los cursores nativos de AlphaTab para evitar dobles líneas */
-        .at-cursor-beat, .at-selection, .at-cursor { display: none !important; }
-
-        /* Cursor maestro custom controlado por JS */
-        #master-cursor {
-            position: absolute;
-            background-color: rgba(255, 0, 0, 0.22) !important;
-            border-left: 3px solid #ff0000 !important;
-            z-index: 2500 !important;
-            pointer-events: none;
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
             display: none;
-            box-sizing: border-box;
-            /* La transición se gestiona dinámicamente desde JS */
+            z-index: 10;
+            background: rgba(0,0,0,0.7);
+            padding: 12px 24px;
+            border-radius: 8px;
+        }
+
+        /* ============================================
+           CURSOR NATIVO DE ALPHATAB (igual que GProTab.net)
+           ============================================ */
+
+        /* Barra de compás actual — fondo amarillo sutil */
+        .at-cursor-bar {
+            background: rgba(255, 242, 0, 0.12) !important;
+        }
+
+        /* Cursor de beat — línea roja vertical que avanza por cada nota */
+        .at-cursor-beat {
+            background: rgba(220, 0, 0, 0.7) !important;
+            width: 3px !important;
+        }
+
+        /* Selección de notas */
+        .at-selection div {
+            background: rgba(64, 64, 255, 0.08) !important;
         }
     </style>
 </head>
 <body>
 
+<!-- Contenedor con scroll que AlphaTab controlará para seguir al cursor -->
 <div class="at-container" id="scroll-container">
     <div id="alphaTab"></div>
-    <div id="master-cursor"></div>
 </div>
 <div id="loading">Cargando partitura...</div>
 
@@ -48,288 +73,137 @@
     // ============================================================
     // VARIABLES GLOBALES
     // ============================================================
-    var api = null, isInitialized = false, pendingTrackIndex = 0;
-    var totalDuration = 60, totalTicks = 960;
+    var api = null;
+    var totalTicks = 0;
+    var scoreDurationMs = 0;
     var VIDEO_TOTAL_DURATION = 180;
     var hasExternalDuration = false;
+    var isPlayerReady = false;
+    var pendingTrackIndex = 0;
 
-    var ultimoRenglonY = -1;
-    var masterCursorEl = null;
-    var cajasCompases = []; // Geometría + ticks de cada compás
-    var usandoTicks = false; // Flag: ¿tenemos datos de ticks reales?
-
-    function debug(m) {
-        console.log('[JS]', m);
-    }
+    function debug(m) { console.log('[JS]', m); }
 
     // ============================================================
-    // INICIALIZACIÓN DE ALPHATAB
+    // INICIALIZACIÓN DE ALPHATAB CON REPRODUCTOR Y CURSOR NATIVOS
+    // (Mismo enfoque que GProTab.net / Songsterr)
     // ============================================================
+    var scrollContainer = document.getElementById('scroll-container');
+
     api = new alphaTab.AlphaTabApi(document.getElementById('alphaTab'), {
-        player: { enablePlayer: false, enableCursor: false },
-        core: { fileReadUrl: 'https://appassets.androidplatform.net/assets/', includeNoteBounds: true },
-        display: { layout: 'page', scrollMode: 'off' }
-    });
-
-    // Evento: partitura cargada en memoria
-    if (api.scoreLoaded && api.scoreLoaded.on) {
-        api.scoreLoaded.on(function(s) {
-            totalDuration = s.duration || 60;
-            totalTicks = s.endTick || 960;
-            debug('🎵 Partitura cargada. Duración: ' + totalDuration + 's, Ticks totales: ' + totalTicks);
-            if (!hasExternalDuration) {
-                VIDEO_TOTAL_DURATION = totalDuration;
-                debug('⏱️ Usando duración de la partitura: ' + VIDEO_TOTAL_DURATION + 's');
-            } else {
-                debug('⏱️ Manteniendo duración externa del vídeo: ' + VIDEO_TOTAL_DURATION + 's');
-            }
-        });
-    }
-
-    // Evento: renderizado visual completado (se dispara cada vez que AlphaTab redibuja)
-    if (api.renderFinished && api.renderFinished.on) {
-        api.renderFinished.on(function() {
-            document.getElementById('loading').style.display = 'none';
-            masterCursorEl = document.getElementById('master-cursor');
-
-            debug('⏳ Render finalizado. Recalculando mapa de compases...');
-            setTimeout(function() {
-                mapearCompasesDesdeGeometria();
-            }, 400);
-        });
-    }
-
-    // ============================================================
-    // HANDLER DE RESIZE — CLAVE PARA QUE FUNCIONE EN HORIZONTAL
-    // Cuando la pantalla rota, el ancho del WebView cambia.
-    // AlphaTab no se re-renderiza solo, hay que forzarlo.
-    // ============================================================
-    var resizeTimeout = null;
-    window.addEventListener('resize', function() {
-        if (resizeTimeout) clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(function() {
-            debug('📐 Resize detectado (' + window.innerWidth + 'x' + window.innerHeight + '). Forzando re-render...');
-            if (api && api.score) {
-                isInitialized = false;
-                cajasCompases = [];
-                ultimoRenglonY = -1;
-                if (masterCursorEl) masterCursorEl.style.display = 'none';
-                // Forzar re-render de AlphaTab con las nuevas dimensiones
-                try {
-                    if (typeof api.render === 'function') {
-                        api.render();
-                    } else {
-                        api.renderTracks([api.score.tracks[pendingTrackIndex]]);
-                    }
-                } catch (e) {
-                    debug('⚠️ Error en re-render por resize: ' + e.message);
-                }
-            }
-        }, 300);
+        player: {
+            enablePlayer: true,
+            enableCursor: true,
+            scrollElement: scrollContainer,
+            soundFont: 'https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.3.0/dist/soundfont/sonivox.sf2'
+        },
+        core: {
+            fileReadUrl: 'https://appassets.androidplatform.net/assets/',
+            includeNoteBounds: true
+        },
+        display: {
+            layoutMode: 1 // Page layout
+        }
     });
 
     // ============================================================
-    // MAPEADOR DE COMPASES — Lee geometría visual Y ticks temporales
+    // EVENTO: Partitura cargada en memoria
     // ============================================================
-    function mapearCompasesDesdeGeometria() {
-        cajasCompases = [];
-        ultimoRenglonY = -1;
-        usandoTicks = false;
+    api.scoreLoaded.on(function(score) {
+        totalTicks = score.endTick || 0;
+        scoreDurationMs = (score.duration || 60) * 1000;
 
-        if (!api.score || !api.score.masterBars) {
-            debug('❌ Error: Estructura del score ausente.');
-            return;
+        debug('🎵 Score cargado. Ticks: ' + totalTicks + ', Duración: ' + (scoreDurationMs/1000) + 's');
+
+        if (!hasExternalDuration) {
+            VIDEO_TOTAL_DURATION = scoreDurationMs / 1000;
+            debug('⏱️ Usando duración del score: ' + VIDEO_TOTAL_DURATION + 's');
         }
 
+        // Informar a Kotlin de la duración real
         try {
-            var lookup = api.boundsLookup || (api.renderer ? api.renderer.boundsLookup : null);
-            if (lookup && lookup.staffSystems) {
-                lookup.staffSystems.forEach(function(system) {
-                    if (system.bars) {
-                        system.bars.forEach(function(barBounds) {
-                            // Filtrar por el track seleccionado
-                            var trackIdx = -1;
-                            if (barBounds.bar) {
-                                if (barBounds.bar.track) {
-                                    trackIdx = barBounds.bar.track.index;
-                                } else if (typeof barBounds.bar.trackIndex !== 'undefined') {
-                                    trackIdx = barBounds.bar.trackIndex;
-                                }
-                            }
-                            if (trackIdx !== pendingTrackIndex) return;
-
-                            var bounds = barBounds.realBounds || barBounds.visualBounds;
-                            if (!bounds || bounds.w <= 0 || bounds.h <= 0) return;
-
-                            // Obtener info temporal del MasterBar correspondiente
-                            var barIndex = barBounds.bar.index;
-                            var masterBar = null;
-                            try {
-                                if (barBounds.bar.masterBar) {
-                                    masterBar = barBounds.bar.masterBar;
-                                } else if (api.score.masterBars[barIndex]) {
-                                    masterBar = api.score.masterBars[barIndex];
-                                }
-                            } catch (e) { /* Silenciar si no accesible */ }
-
-                            var startTick = 0;
-                            var durTick = 0;
-                            if (masterBar) {
-                                startTick = masterBar.start || 0;
-                                // calculatedDuration puede ser propiedad o método según versión
-                                if (typeof masterBar.calculatedDuration !== 'undefined') {
-                                    durTick = masterBar.calculatedDuration;
-                                } else if (typeof masterBar.calculateDuration === 'function') {
-                                    durTick = masterBar.calculateDuration();
-                                }
-                            }
-
-                            cajasCompases.push({
-                                index: barIndex,
-                                x: bounds.x,
-                                y: bounds.y,
-                                w: bounds.w,
-                                h: bounds.h,
-                                startTick: startTick,
-                                endTick: startTick + durTick
-                            });
-                        });
-                    }
-                });
+            if (typeof Android !== 'undefined' && Android.onDurationReady) {
+                Android.onDurationReady(scoreDurationMs / 1000);
             }
-
-            // Ordenar por índice del compás
-            cajasCompases.sort(function(a, b) { return a.index - b.index; });
-
-            if (cajasCompases.length > 0) {
-                // Comprobar si tenemos datos de ticks reales
-                var lastCompas = cajasCompases[cajasCompases.length - 1];
-                if (lastCompas.endTick > 0) {
-                    usandoTicks = true;
-                    totalTicks = lastCompas.endTick;
-                }
-                isInitialized = true;
-                debug('📦 Mapa completado: ' + cajasCompases.length + ' compases | Ticks: ' + (usandoTicks ? 'SÍ (' + totalTicks + ')' : 'NO (fallback uniforme)'));
-            } else {
-                // Plan B: Estimación por bloques si boundsLookup no funciona
-                var atEl = document.getElementById('alphaTab');
-                var numBars = Math.max(3, api.score.masterBars.length);
-                var totalH = atEl ? atEl.clientHeight : 600;
-                var totalW = atEl ? atEl.clientWidth : 360;
-                var altoIndividual = totalH / numBars;
-
-                for (var k = 0; k < numBars; k++) {
-                    cajasCompases.push({
-                        index: k,
-                        x: 0,
-                        y: k * altoIndividual,
-                        w: totalW,
-                        h: altoIndividual,
-                        startTick: 0,
-                        endTick: 0
-                    });
-                }
-                isInitialized = true;
-                debug('📦 Plan B activo: ' + numBars + ' bloques estimados.');
-            }
-        } catch (e) {
-            debug('❌ Fallo en mapeo de compases: ' + e.message);
-        }
-    }
+        } catch(e) {}
+    });
 
     // ============================================================
-    // SINCRONIZACIÓN DEL CURSOR — Posiciona el cursor según los segundos
+    // EVENTO: Renderizado visual completado
     // ============================================================
-    function sincronizarConVideo(seconds) {
-        if (!isInitialized || cajasCompases.length === 0 || !masterCursorEl) return;
+    api.renderFinished.on(function() {
+        document.getElementById('loading').style.display = 'none';
+        debug('✅ Render completado.');
+    });
 
-        var progressPercent = seconds / VIDEO_TOTAL_DURATION;
-        if (progressPercent > 1) progressPercent = 1;
-        if (progressPercent < 0) progressPercent = 0;
+    // ============================================================
+    // EVENTO: Reproductor listo (SoundFont cargado)
+    // ============================================================
+    api.playerReady.on(function() {
+        isPlayerReady = true;
+        // Mutear por defecto — para canciones YouTube no queremos doble audio.
+        // Para locales, Kotlin llamará a unmute().
+        api.masterVolume = 0;
+        debug('🔊 Player listo (SoundFont cargado). Cursor nativo activo.');
+    });
 
-        var indexCompasActual = 0;
-        var progresoInternoCompas = 0;
-
-        if (usandoTicks && totalTicks > 0) {
-            // ✅ MAPEO POR TICKS REALES — Preciso con cambios de tempo
-            var currentTick = progressPercent * totalTicks;
-
-            // Búsqueda binaria del compás que contiene este tick
-            var lo = 0, hi = cajasCompases.length - 1;
-            while (lo <= hi) {
-                var mid = Math.floor((lo + hi) / 2);
-                if (cajasCompases[mid].startTick <= currentTick) {
-                    indexCompasActual = mid;
-                    lo = mid + 1;
-                } else {
-                    hi = mid - 1;
-                }
-            }
-
-            var compas = cajasCompases[indexCompasActual];
-            var tickRange = compas.endTick - compas.startTick;
-            if (tickRange > 0) {
-                progresoInternoCompas = (currentTick - compas.startTick) / tickRange;
-            }
-        } else {
-            // Fallback: distribución uniforme (menos preciso pero funcional)
-            var duracionPorCompas = VIDEO_TOTAL_DURATION / cajasCompases.length;
-            indexCompasActual = Math.floor(seconds / duracionPorCompas);
-            if (indexCompasActual >= cajasCompases.length) indexCompasActual = cajasCompases.length - 1;
-            if (indexCompasActual < 0) indexCompasActual = 0;
-
-            var tiempoInicioCompas = indexCompasActual * duracionPorCompas;
-            progresoInternoCompas = (seconds - tiempoInicioCompas) / duracionPorCompas;
-        }
-
-        // Clamp del progreso dentro del compás
-        if (progresoInternoCompas > 1) progresoInternoCompas = 1;
-        if (progresoInternoCompas < 0) progresoInternoCompas = 0;
-
-        var compas = cajasCompases[indexCompasActual];
-        var cursorX = compas.x + (progresoInternoCompas * compas.w);
-        var anchoCursorNota = 24;
-
-        masterCursorEl.style.display = 'block';
-
-        if (compas.y !== ultimoRenglonY) {
-            // Salto de renglón: reposicionar sin transición para evitar barridos diagonales
-            masterCursorEl.style.transition = 'none';
-            masterCursorEl.style.left = cursorX + 'px';
-            masterCursorEl.style.top = (compas.y + 4) + 'px';
-            masterCursorEl.style.width = anchoCursorNota + 'px';
-            masterCursorEl.style.height = (compas.h - 8) + 'px';
-
-            void masterCursorEl.offsetWidth; // Forzar reflow del navegador
-
-            masterCursorEl.style.transition = 'left 0.15s linear';
-
-            ultimoRenglonY = compas.y;
-
-            // Auto-scroll suave para mantener el compás visible
-            var container = document.getElementById('scroll-container');
-            if (container) {
-                var targetScroll = compas.y - (container.clientHeight * 0.15);
-                if (targetScroll < 0) targetScroll = 0;
-                container.scrollTo({ top: targetScroll, behavior: 'smooth' });
-            }
-        } else {
-            // Mismo renglón: desplazamiento suave horizontal
-            masterCursorEl.style.left = cursorX + 'px';
-            masterCursorEl.style.top = (compas.y + 4) + 'px';
-            masterCursorEl.style.width = anchoCursorNota + 'px';
-            masterCursorEl.style.height = (compas.h - 8) + 'px';
-        }
-    }
+    // ============================================================
+    // EVENTO: Posición del reproductor cambia (para debug / futuro uso)
+    // ============================================================
+    api.playerPositionChanged.on(function(e) {
+        // e.currentTick, e.endTick, e.currentTime (ms), e.endTime (ms)
+    });
 
     // ============================================================
     // API PÚBLICA — Llamadas desde Kotlin (Android Bridge)
     // ============================================================
-    function correctAutoScrollTime(time) { sincronizarConVideo(time); }
-    function updateScrollPosition(time) { sincronizarConVideo(time); }
-    function startAutoScroll(resumeTime) { sincronizarConVideo(resumeTime); }
-    function stopAutoScroll() {}
 
+    /**
+     * Carga una canción. Si duration > 0, es una canción con YouTube (sync externo).
+     * Si duration = 0 o no se pasa, es una canción local (AlphaTab maneja todo).
+     */
+    function loadSong(fileName, trackIndex, duration) {
+        pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
+
+        if (duration && Number(duration) > 0) {
+            VIDEO_TOTAL_DURATION = Number(duration);
+            hasExternalDuration = true;
+        } else {
+            hasExternalDuration = false;
+        }
+
+        document.getElementById('loading').style.display = 'block';
+        isPlayerReady = false;
+
+        var url = fileName.startsWith('http')
+            ? fileName
+            : 'https://appassets.androidplatform.net/assets/' + fileName.replace(/^\/+/, '');
+
+        debug('📂 Cargando: ' + url + ', track: ' + pendingTrackIndex);
+        api.load(url, [pendingTrackIndex]);
+    }
+
+    /**
+     * FUNCIÓN CLAVE: Sincroniza el cursor nativo de AlphaTab con el tiempo del vídeo YouTube.
+     * Convierte segundos → ticks y usa api.tickPosition para mover el cursor.
+     * El cursor nativo de AlphaTab se mueve a nivel de BEAT (no de compás), igual que GProTab.net.
+     */
+    function correctAutoScrollTime(seconds) {
+        if (!isPlayerReady || totalTicks <= 0 || VIDEO_TOTAL_DURATION <= 0) return;
+
+        var progress = seconds / VIDEO_TOTAL_DURATION;
+        if (progress < 0) progress = 0;
+        if (progress > 1) progress = 1;
+
+        var tick = Math.round(progress * totalTicks);
+        api.tickPosition = tick;
+    }
+
+    /** Alias para compatibilidad con las llamadas existentes desde Kotlin */
+    function updateScrollPosition(time) { correctAutoScrollTime(time); }
+    function startAutoScroll(resumeTime) { correctAutoScrollTime(resumeTime); }
+    function stopAutoScroll() { /* El cursor se queda donde está */ }
+
+    /** Establece la duración total del vídeo de YouTube */
     function setVideoDuration(duration) {
         if (duration && Number(duration) > 0) {
             VIDEO_TOTAL_DURATION = Number(duration);
@@ -338,34 +212,59 @@
         }
     }
 
-    function loadSong(fileName, trackIndex, duration) {
-        pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
-        if (duration && Number(duration) > 0) {
-            VIDEO_TOTAL_DURATION = Number(duration);
-            hasExternalDuration = true;
-        } else {
-            hasExternalDuration = false;
-        }
-        document.getElementById('loading').style.display = 'block';
-        isInitialized = false;
-        usandoTicks = false;
-        cajasCompases = [];
-        if (masterCursorEl) masterCursorEl.style.display = 'none';
-        api.load(fileName.startsWith('http') ? fileName : 'https://appassets.androidplatform.net/assets/' + fileName.replace(/^\/+/, ''), [pendingTrackIndex]);
-    }
-
+    /** Cambia la pista/instrumento visible */
     function changeTrack(trackIndex) {
         pendingTrackIndex = Math.max(0, Number(trackIndex) || 0);
-        if (api && api.score) {
-            isInitialized = false;
-            usandoTicks = false;
-            cajasCompases = [];
-            if (masterCursorEl) masterCursorEl.style.display = 'none';
+        if (api && api.score && api.score.tracks[pendingTrackIndex]) {
             api.renderTracks([api.score.tracks[pendingTrackIndex]]);
         }
     }
 
-    function isReady() { return isInitialized; }
+    // ============================================================
+    // CONTROLES DE REPRODUCCIÓN LOCAL (para canciones .gp3 sin YouTube)
+    // AlphaTab reproduce el audio del Guitar Pro → cursor + sonido
+    // ============================================================
+
+    /** Inicia la reproducción nativa de AlphaTab (audio del .gp3) */
+    function playLocal() {
+        if (isPlayerReady) {
+            api.masterVolume = 1.0;
+            api.play();
+            debug('▶️ Reproducción local iniciada');
+        }
+    }
+
+    /** Pausa la reproducción nativa */
+    function pauseLocal() {
+        if (isPlayerReady) {
+            api.pause();
+            debug('⏸️ Reproducción local pausada');
+        }
+    }
+
+    /** Cambia la velocidad de reproducción (0.25 a 2.0) */
+    function setPlaybackSpeed(speed) {
+        var s = Number(speed) || 1.0;
+        if (s < 0.25) s = 0.25;
+        if (s > 2.0) s = 2.0;
+        if (isPlayerReady) {
+            api.playbackSpeed = s;
+            debug('⚡ Velocidad: ' + s + 'x');
+        }
+    }
+
+    /** Desmutea el audio de AlphaTab (para canciones locales) */
+    function unmute() {
+        if (api) api.masterVolume = 1.0;
+    }
+
+    /** Mutea el audio de AlphaTab (para canciones YouTube donde no queremos doble audio) */
+    function mute() {
+        if (api) api.masterVolume = 0;
+    }
+
+    /** Verifica si el reproductor está listo */
+    function isReady() { return isPlayerReady; }
 </script>
 </body>
 </html>
