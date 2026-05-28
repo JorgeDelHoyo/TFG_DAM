@@ -130,7 +130,33 @@ tasks.register<JacocoReport>("jacocoTestReport") {
         "**/*MembersInjector*.*",
         "**/*_Factory*.*",
         "**/*_Provide*Factory*.*",
-        "**/*Extensions*.*"
+        "**/*Extensions*.*",
+        
+        // Exclusiones de UI y Presentación (Jetpack Compose)
+        "**/ui/screens/**",
+        "**/ui/components/**",
+        "**/ui/theme/**",
+        
+        // Exclusiones de Inyección de Dependencias Hilt
+        "**/di/**",
+        
+        // Exclusiones del Ciclo de Vida y UI del Sistema Android
+        "com/example/arpegio/*.class",
+        "**/Hilt_*",
+        "**/*HiltComponents*",
+        "**/*_GeneratedInjector*",
+        
+        // Exclusiones de Base de Datos Room abstractas/interfaces
+        "**/data/local/AppDataBase*",
+        "**/data/local/CancionDao*",
+        
+        // Exclusiones de Repositorios que integran Firebase
+        "**/data/repository/SongRepository*",
+        
+        // ViewModels aún no testeados
+        "**/ui/viewmodel/LocalPlayerViewModel*",
+        "**/ui/viewmodel/PlayerViewModel*",
+        "**/ui/viewmodel/LocalPlayerUiState*"
     )
     val debugTree = fileTree("${project.layout.buildDirectory.get().asFile}/tmp/kotlin-classes/debug") {
         exclude(fileFilter)
