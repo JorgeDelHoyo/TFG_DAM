@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.tfgv01"
+    namespace = "com.example.arpegio"
     compileSdk = 34
 
     defaultConfig {
