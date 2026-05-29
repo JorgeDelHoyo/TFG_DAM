@@ -1,4 +1,4 @@
-// app/src/main/java/com/example/tfgv01/ui/screens/LibraryScreen.kt
+// app/src/main/java/com/example/arpegio/ui/screens/LibraryScreen.kt
 package com.example.arpegio.ui.screens
 
 import android.net.Uri
@@ -6,11 +6,14 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ExpandLess
@@ -23,9 +26,13 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.arpegio.data.model.Song
@@ -78,6 +85,9 @@ fun LibraryScreen(
                 val filteredRemoteSongs = remember(state.remoteSongs, searchQuery) {
                     state.remoteSongs.filterByTitleOrArtist(searchQuery)
                 }
+                val filteredLocalSongs = remember(state.localSongs, searchQuery) {
+                    state.localSongs.filterByTitleOrArtist(searchQuery)
+                }
 
                 Column(modifier = Modifier.fillMaxSize().padding(padding)) {
                     SearchField(
@@ -92,7 +102,7 @@ fun LibraryScreen(
                         LazyColumn(
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             item {
                                 Text(
@@ -106,7 +116,8 @@ fun LibraryScreen(
                             if (filteredRemoteSongs.isEmpty()) {
                                 item {
                                     Text(
-                                        text = "No hay canciones globales coincidentes",
+                                        text = if (searchQuery.isNotBlank()) "Sin resultados para \"$searchQuery\""
+                                               else "No hay canciones de la comunidad aún",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.padding(vertical = 8.dp)
@@ -120,9 +131,10 @@ fun LibraryScreen(
                         }
                     }
 
-                    // Se pasan las nuevas funciones lambda al componente de canciones locales
+                    // Se pasan las canciones locales filtradas al componente
                     LocalSongsSection(
                         state = state,
+                        filteredLocalSongs = filteredLocalSongs,
                         onHeaderClick = viewModel::toggleLocalExpanded,
                         onAddSongClick = { showAddDialog = true },
                         onSongClick = onSongSelected,
@@ -165,6 +177,7 @@ fun LibraryScreen(
 @Composable
 private fun LocalSongsSection(
     state: LibraryUiState.Success,
+    filteredLocalSongs: List<Song>,
     onHeaderClick: () -> Unit,
     onAddSongClick: () -> Unit,
     onSongClick: (Song) -> Unit,
@@ -205,23 +218,24 @@ private fun LocalSongsSection(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Importar archivo .gp3 local")
+                    Text("Importar partitura local")
                 }
                 Spacer(modifier = Modifier.height(8.dp))
 
-                if (state.localSongs.isEmpty()) {
+                if (filteredLocalSongs.isEmpty()) {
                     Text(
-                        text = "Aún no has subido partituras personales.",
+                        text = if (state.localSongs.isEmpty()) "Aún no has subido partituras personales."
+                               else "Sin resultados en tus canciones locales.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
                 } else {
                     LazyColumn(
-                        modifier = Modifier.heightIn(max = 200.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier.heightIn(max = 240.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        items(state.localSongs, key = { it.id }) { song ->
+                        items(filteredLocalSongs, key = { it.id }) { song ->
                             var menuExpanded by remember { mutableStateOf(false) }
 
                             Surface(
@@ -232,7 +246,7 @@ private fun LocalSongsSection(
                                 shape = MaterialTheme.shapes.small
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+                                    modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
@@ -240,9 +254,36 @@ private fun LocalSongsSection(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier.weight(1f)
                                     ) {
-                                        Icon(Icons.Default.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        // Icono circular pequeño
+                                        Box(
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Default.MusicNote,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
                                         Spacer(modifier = Modifier.width(12.dp))
-                                        Text(text = song.title, style = MaterialTheme.typography.bodyLarge)
+                                        Column {
+                                            Text(
+                                                text = song.title,
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                fontWeight = FontWeight.Medium,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "Archivo local",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                                            )
+                                        }
                                     }
 
                                     // Menú de opciones contextual flotante de 3 puntos (Editar/Eliminar)
@@ -389,26 +430,146 @@ private fun SearchField(
     )
 }
 
+/**
+ * Tarjeta visual premium para cada canción de la comunidad.
+ *
+ * Muestra: icono circular con nota musical, título en negrita,
+ * artista en color primario, chip de dificultad con código de color
+ * (verde/naranja/rojo), lista de instrumentos disponibles, y flecha
+ * de navegación indicando interactividad.
+ */
 @Composable
 private fun SongItem(song: Song, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = song.title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-            Text(text = song.artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (song.difficulty.isNotBlank()) {
-                AssistChip(
-                    onClick = {},
-                    label = { Text(song.difficulty) },
-                    modifier = Modifier.padding(top = 8.dp),
-                    enabled = false
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // ── Icono circular con nota musical ──
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(26.dp)
                 )
             }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            // ── Contenido central: título, artista, dificultad + instrumentos ──
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                // Título destacado
+                Text(
+                    text = song.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                // Artista — prominente con color primario
+                Text(
+                    text = song.artist,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Fila de metadatos: dificultad + instrumentos
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Chip de dificultad con color codificado
+                    if (song.difficulty.isNotBlank()) {
+                        DifficultyBadge(difficulty = song.difficulty)
+                    }
+
+                    // Instrumentos disponibles
+                    if (song.tabs.isNotEmpty()) {
+                        Text(
+                            text = song.tabs.keys.joinToString(" · ") { instrument ->
+                                instrument.replaceFirstChar {
+                                    if (it.isLowerCase()) it.titlecase() else it.toString()
+                                }
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // ── Flecha de navegación ──
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = "Abrir canción",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.size(24.dp)
+            )
         }
+    }
+}
+
+/**
+ * Badge compacto de dificultad con código de color:
+ * - Verde (beginner) — para principiantes
+ * - Naranja (intermediate) — nivel medio
+ * - Rojo (advanced) — nivel avanzado
+ */
+@Composable
+private fun DifficultyBadge(difficulty: String) {
+    val (label, color) = when (difficulty.lowercase()) {
+        "beginner" -> "Fácil" to Color(0xFF4CAF50)
+        "intermediate" -> "Media" to Color(0xFFFFA726)
+        "advanced" -> "Difícil" to Color(0xFFEF5350)
+        else -> difficulty.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase() else it.toString()
+        } to MaterialTheme.colorScheme.outline
+    }
+
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = color.copy(alpha = 0.12f)
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = color,
+            fontSize = 11.sp
+        )
     }
 }
 
