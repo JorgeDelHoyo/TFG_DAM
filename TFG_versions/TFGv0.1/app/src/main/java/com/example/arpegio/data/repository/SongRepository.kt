@@ -26,7 +26,7 @@ import javax.inject.Singleton
  * las dos fuentes de datos de la aplicación:
  *
  * 1. **Firestore (remoto):** Canciones de la comunidad con vídeo de YouTube + tablatura.
- * 2. **Room (local):** Archivos .gp3 importados por el usuario desde su dispositivo.
+ * 2. **Room (local):** Archivos .gp(x) importados por el usuario desde su dispositivo.
  *
  * Inyectado como @Singleton para compartir una única instancia en toda la app.
  *

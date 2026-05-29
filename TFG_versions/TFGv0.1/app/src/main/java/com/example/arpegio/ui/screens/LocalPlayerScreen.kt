@@ -49,7 +49,7 @@ fun LocalPlayerScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    // 🎹 LÓGICA DE BPM: Usamos el tempo real de la partitura
+    // LÓGICA DE BPM: Usamos el tempo real de la partitura
     val bpmActuales = (uiState.originalBPM * uiState.currentTempoMultiplier).toInt()
 
     // Inicializar el ViewModel de forma segura
@@ -57,7 +57,7 @@ fun LocalPlayerScreen(
         viewModel.init(song)
     }
 
-    // 🛡️ BÚSQUEDA INTELIGENTE DE RUTA
+    // BÚSQUEDA INTELIGENTE DE RUTA
     val currentLocalPath = remember(song, uiState.selectedInstrument) {
         song.tabs[uiState.selectedInstrument]
             ?: song.tabs.values.firstOrNull()
@@ -70,7 +70,7 @@ fun LocalPlayerScreen(
 
     val partituraWebViewRef = remember { mutableStateOf<WebView?>(null) }
 
-    // 🎯 ACTUALIZACIÓN DE VELOCIDAD NATIVA
+    // ACTUALIZACIÓN DE VELOCIDAD NATIVA
     LaunchedEffect(uiState.currentTempoMultiplier) {
         partituraWebViewRef.value?.evaluateJavascript(
             "setPlaybackSpeed(${uiState.currentTempoMultiplier});", null

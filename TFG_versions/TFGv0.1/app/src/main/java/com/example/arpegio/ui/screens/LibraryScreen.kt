@@ -390,7 +390,7 @@ private fun AddSongDialog(
                     onClick = { filePickerLauncher.launch("*/*") },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Buscar .gp3 en el dispositivo")
+                    Text("Buscar partitura en el dispositivo")
                 }
                 Text(text = fileName, style = MaterialTheme.typography.bodySmall, maxLines = 1)
             }
@@ -582,7 +582,7 @@ private fun EmptyLibraryView(modifier: Modifier = Modifier) {
     ) {
         Text("🎵 No hay canciones aún", style = MaterialTheme.typography.titleLarge)
         Text(
-            "Carga temas en Firebase o importa tus .gp3 locales.",
+            "Carga temas en Firebase o importa tus partituras locales.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

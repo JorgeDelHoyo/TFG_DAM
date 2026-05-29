@@ -33,8 +33,8 @@ data class SeekEvent(
 data class ExternalControls(
     val play: Boolean = false,
     val playbackSpeed: Float = 1.0f,
-    val isMuted: Boolean = false, // 👈 Agregamos el estado de mute
-    val seekEvent: SeekEvent? = null // 👈 Evento único de seek con timestamp para evitar repeticiones
+    val isMuted: Boolean = false, //  Estado de mute
+    val seekEvent: SeekEvent? = null // Evento único de seek con timestamp para evitar repeticiones
 )
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -51,7 +51,7 @@ fun YouTubePlayer(
     val latestOnCurrentSecond by rememberUpdatedState(onCurrentSecond)
     val latestOnDurationReady by rememberUpdatedState(onDurationReady)
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
-    var lastProcessedSeekEventTimestamp by remember { mutableStateOf<Long?>(null) } // 👈 Recordar el timestamp del último seek procesado
+    var lastProcessedSeekEventTimestamp by remember { mutableStateOf<Long?>(null) } // Recordar el timestamp del último seek procesado
 
     DisposableEffect(Unit) {
         onDispose {
@@ -139,11 +139,11 @@ fun YouTubePlayer(
                     "if (window.setPlaybackSpeed) { setPlaybackSpeed(${controls.playbackSpeed.toValidYouTubeRate()}); }",
                     null
                 )
-                // 👈 Evaluamos dinámicamente si hay que mutear o desmutear en el JS
+                // Evalua dinámicamente si hay que mutear o desmutear en el JS
                 val muteCommand = if (controls.isMuted) "muteVideo" else "unmuteVideo"
                 webView.evaluateJavascript("if (window.$muteCommand) { $muteCommand(); }", null)
 
-                // 👈 Si hay un evento de seek y no ha sido procesado aún
+                // Si hay un evento de seek y no ha sido procesado aún
                 controls.seekEvent?.let { event ->
                     if (event.timestamp != lastProcessedSeekEventTimestamp) {
                         lastProcessedSeekEventTimestamp = event.timestamp
@@ -267,7 +267,7 @@ private fun buildYouTubeHtml(videoId: String, autoplay: Boolean): String {
                     if (player && player.setPlaybackRate) { player.setPlaybackRate(rate); }
                 }
 
-                // 👈 Funciones JS mapeadas para la API de YouTube
+                // Funciones JS mapeadas para la API de YouTube
                 function muteVideo() {
                     pendingMute = true;
                     if (player && player.mute) { player.mute(); }

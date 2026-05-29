@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/tfgv01/ui/screens/PlayerScreen.kt
 package com.example.arpegio.ui.screens
 
 import android.content.res.Configuration

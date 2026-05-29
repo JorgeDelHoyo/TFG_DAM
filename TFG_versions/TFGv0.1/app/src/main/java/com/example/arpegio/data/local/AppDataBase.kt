@@ -8,7 +8,7 @@ import com.example.arpegio.data.model.Song
 /**
  * Base de datos local de la aplicación, implementada con Room (abstracción sobre SQLite).
  *
- * Contiene una única tabla `canciones_locales` para persistir los archivos .gp3
+ * Contiene una única tabla `canciones_locales` para persistir los archivos .gp(x)
  * importados por el usuario desde su dispositivo.
  *
  * @see Converters para la serialización de Map, List y Date.
