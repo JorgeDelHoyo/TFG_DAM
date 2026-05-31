@@ -14,9 +14,9 @@ import javax.inject.Singleton
 /**
  * Módulo de inyección de dependencias de Hilt para la capa de datos local.
  *
- * Proporciona:
+ * Proporciona
  * - La instancia Singleton de [AppDataBase] (Room).
- * - El [CancionDao] extraído de la base de datos.
+ * - El CancionDao extraído de la base de datos.
  *
  * La base de datos se almacena como "arpegio_local_db" en el almacenamiento
  * interno del dispositivo y persiste entre sesiones.

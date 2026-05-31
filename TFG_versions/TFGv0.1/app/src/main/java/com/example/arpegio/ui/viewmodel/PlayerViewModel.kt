@@ -14,9 +14,8 @@ import javax.inject.Inject
  * ViewModel para la pantalla de reproductor principal (canciones de Firebase + YouTube).
  *
  * Gestiona el estado de reproducción del vídeo de YouTube sincronizado con la partitura.
- * El [SavedStateHandle] permite restaurar estado tras la destrucción del proceso.
+ * SavedStateHandle permite restaurar estado tras la destrucción del proceso.
  *
- * @property savedStateHandle handle inyectado por Hilt para persistir estado ante config changes.
  */
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
@@ -44,7 +43,7 @@ class PlayerViewModel @Inject constructor(
     val syncOffset: StateFlow<Float> = _syncOffset.asStateFlow()
 
     /**
-     * Carga una canción y reinicia todo el estado de reproducción.
+     * Carga una canción y reinicia el estado de reproducción.
      * Selecciona el primer instrumento disponible en las tablaturas de la canción.
      */
     fun loadSong(song: Song) {
@@ -52,7 +51,7 @@ class PlayerViewModel @Inject constructor(
         _isPlaying.value = false
         _currentTime.value = 0f
         _isMuted.value = false
-        _syncOffset.value = 0f // Resetear el offset al cambiar de canción
+        _syncOffset.value = 0f
         _selectedInstrument.value = song.tabs.keys.firstOrNull() ?: "guitar"
     }
 
@@ -78,13 +77,13 @@ class PlayerViewModel @Inject constructor(
 
     /**
      * Actualiza el tiempo actual de reproducción del vídeo.
-     * Llamado desde el bridge de JavaScript del reproductor de YouTube (~2 veces/seg).
+     * Llamado desde el bridge de JavaScript del reproductor de YouTube (más o menos 2 veces/seg).
      */
     fun updateCurrentTime(seconds: Float) {
         _currentTime.value = seconds
     }
 
-    /** Salta a un segundo específico del vídeo (seek). */
+    /** Salta a un segundo específico del vídeo. */
     fun seekTo(seconds: Float) {
         _currentTime.value = seconds
     }
@@ -98,7 +97,7 @@ class PlayerViewModel @Inject constructor(
      * Obtiene la ruta del asset de tablatura para el instrumento seleccionado,
      * limpiando prefijos innecesarios que podrían venir de Firebase.
      *
-     * @return Ruta relativa del archivo .gp3 dentro de /assets/, o null si no hay tab.
+     * @return Ruta relativa del archivo local dentro de /assets/, o null si no hay tab.
      */
     fun getTabAssetPath(): String? {
         val song = _song.value ?: return null

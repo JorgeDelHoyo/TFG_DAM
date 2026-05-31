@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LibraryViewModel.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.example.arpegio.ui.viewmodel</a> &gt; <span class="el_source">LibraryViewModel.kt</span></div><h1>LibraryViewModel.kt</h1><pre class="source lang-java linenums">// app/src/main/java/com/example/tfgv01/ui/viewmodel/LibraryViewModel.kt
+package com.example.arpegio.ui.viewmodel
+
+import android.net.Uri
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.arpegio.data.model.Song
+import com.example.arpegio.data.repository.SongRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+/**
+ * Estado de la interfaz de la pantalla de biblioteca.
+ *
+ * Sealed interface para representar los tres estados posibles:
+ * carga, éxito con datos, o error con mensaje descriptivo.
+ */
+sealed interface LibraryUiState {
+    /** Estado de carga inicial mientras se conectan los flujos de datos. */
+    object Loading : LibraryUiState
+
+    /**
+     * Estado de éxito con las dos listas de canciones.
+     *
+     * @property remoteSongs Canciones de la comunidad (Firestore).
+     * @property localSongs Canciones locales importadas (Room).
+     * @property isLocalExpanded Si la sección de canciones locales está desplegada.
+     */
+<span class="pc" id="L32">    data class Success(</span>
+<span class="fc" id="L33">        val remoteSongs: List&lt;Song&gt;,</span>
+<span class="fc" id="L34">        val localSongs: List&lt;Song&gt;,</span>
+<span class="pc" id="L35">        val isLocalExpanded: Boolean = false</span>
+<span class="nc" id="L36">    ) : LibraryUiState</span>
+
+    /** Estado de error con mensaje para mostrar al usuario. */
+<span class="fc" id="L39">    data class Error(val message: String) : LibraryUiState</span>
+}
+
+/**
+ * Eventos puntuales de la interfaz que no deben persistir en el estado.
+ * Se garantiza que cada evento se consume exactamente una vez.
+ */
+sealed interface LibraryUiEvent {
+<span class="fc" id="L47">    data class ShowToast(val message: String) : LibraryUiEvent</span>
+    object SongAddedSuccess : LibraryUiEvent
+}
+
+/**
+ * ViewModel de la pantalla de biblioteca.
+ *
+ * Combina reactivamente los flujos de Firestore (canciones remotas) y Room (canciones locales)
+ * para mantener la interfaz sincronizada con ambas fuentes de datos.
+ *
+ * @property repository Repositorio de canciones
+ */
+@HiltViewModel
+<span class="fc" id="L60">class LibraryViewModel @Inject constructor(</span>
+<span class="fc" id="L61">    private val repository: SongRepository</span>
+<span class="fc" id="L62">) : ViewModel() {</span>
+
+<span class="fc" id="L64">    private val _uiState = MutableStateFlow&lt;LibraryUiState&gt;(LibraryUiState.Loading)</span>
+<span class="fc" id="L65">    val uiState: StateFlow&lt;LibraryUiState&gt; = _uiState.asStateFlow()</span>
+
+<span class="fc" id="L67">    private val _uiEvent = Channel&lt;LibraryUiEvent&gt;(Channel.BUFFERED)</span>
+<span class="fc" id="L68">    val uiEvent = _uiEvent.receiveAsFlow()</span>
+
+<span class="fc" id="L70">    init {</span>
+<span class="fc" id="L71">        loadAllSongsCombined()</span>
+<span class="fc" id="L72">    }</span>
+
+    /**
+     * Combina los flujos de Firestore y Room para tener una vista unificada.
+     * y se re-emite cada vez que cualquiera de las dos fuentes cambia.
+     */
+    private fun loadAllSongsCombined() {
+<span class="fc" id="L79">        viewModelScope.launch {</span>
+<span class="fc" id="L80">            combine(</span>
+<span class="fc" id="L81">                repository.getSongs(),</span>
+<span class="fc" id="L82">                repository.getLocalSongs()</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            ) { remote, local -&gt;</span>
+<span class="fc bfc" id="L84" title="All 4 branches covered.">                val currentExpanded = (_uiState.value as? LibraryUiState.Success)?.isLocalExpanded ?: false</span>
+<span class="fc" id="L85">                LibraryUiState.Success(</span>
+<span class="fc" id="L86">                    remoteSongs = remote,</span>
+<span class="fc" id="L87">                    localSongs = local,</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                    isLocalExpanded = currentExpanded</span>
+                )
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            }.catch { e -&gt;</span>
+<span class="fc" id="L91">                _uiState.value = LibraryUiState.Error(</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">                    message = e.message ?: &quot;Error al sincronizar las bibliotecas&quot;</span>
+                )
+<span class="fc" id="L94">            }.collect { state -&gt;</span>
+<span class="fc" id="L95">                _uiState.value = state</span>
+<span class="fc" id="L96">            }</span>
+<span class="fc" id="L97">        }</span>
+<span class="fc" id="L98">    }</span>
+
+    /** Elimina una canción local (archivo + registro de Room). */
+    fun deleteSong(song: Song) {
+<span class="fc" id="L102">        viewModelScope.launch {</span>
+<span class="fc" id="L103">            try {</span>
+<span class="fc" id="L104">                repository.deleteLocalSong(song)</span>
+<span class="fc" id="L105">            } catch (e: Exception) {</span>
+<span class="fc" id="L106">                _uiEvent.send(LibraryUiEvent.ShowToast(&quot;Error al eliminar la canción&quot;))</span>
+            }
+<span class="fc" id="L108">        }</span>
+<span class="fc" id="L109">    }</span>
+
+    /** Actualiza el título de una canción local. */
+    fun updateSongTitle(song: Song, newTitle: String) {
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (newTitle.isBlank()) return</span>
+<span class="fc" id="L114">        viewModelScope.launch {</span>
+<span class="fc" id="L115">            try {</span>
+<span class="fc" id="L116">                val updatedSong = song.copy(title = newTitle)</span>
+<span class="fc" id="L117">                repository.updateLocalSong(updatedSong)</span>
+<span class="fc" id="L118">            } catch (e: Exception) {</span>
+<span class="fc" id="L119">                _uiEvent.send(LibraryUiEvent.ShowToast(&quot;Error al renombrar la canción&quot;))</span>
+            }
+<span class="fc" id="L121">        }</span>
+<span class="fc" id="L122">    }</span>
+
+    /** Alterna la visibilidad de la sección de canciones locales. */
+    fun toggleLocalExpanded() {
+<span class="fc" id="L126">        val currentState = _uiState.value</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (currentState is LibraryUiState.Success) {</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            _uiState.value = currentState.copy(isLocalExpanded = !currentState.isLocalExpanded)</span>
+        }
+<span class="fc" id="L130">    }</span>
+
+    /**
+     * Importa un archivo local seleccionado por el usuario.
+     *  Copie el archivo y lo registra en Room.
+     */
+    fun addCustomSong(title: String, fileUri: Uri?) {
+<span class="fc bfc" id="L137" title="All 4 branches covered.">        if (title.isBlank() || fileUri == null) {</span>
+<span class="fc" id="L138">            viewModelScope.launch { _uiEvent.send(LibraryUiEvent.ShowToast(&quot;Campos inválidos&quot;)) }</span>
+<span class="fc" id="L139">            return</span>
+        }
+
+<span class="pc" id="L142">        viewModelScope.launch {</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">            repository.saveLocalSong(title, fileUri)</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                .onSuccess {</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                    _uiEvent.send(LibraryUiEvent.SongAddedSuccess)</span>
+<span class="fc" id="L146">                }</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                .onFailure { error -&gt;</span>
+<span class="pc bpc" id="L148" title="2 of 4 branches missed.">                    _uiEvent.send(LibraryUiEvent.ShowToast(error.localizedMessage ?: &quot;Fallo al importar&quot;))</span>
+<span class="fc" id="L149">                }</span>
+<span class="fc" id="L150">        }</span>
+<span class="fc" id="L151">    }</span>
+
+    /** Reinicia la carga de datos desde ambas fuentes. */
+    fun refresh() {
+<span class="fc" id="L155">        _uiState.value = LibraryUiState.Loading</span>
+<span class="fc" id="L156">        loadAllSongsCombined()</span>
+<span class="fc" id="L157">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

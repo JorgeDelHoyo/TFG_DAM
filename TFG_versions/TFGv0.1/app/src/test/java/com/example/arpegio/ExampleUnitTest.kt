@@ -8,14 +8,12 @@ import java.util.Date
 
 /**
  * Pruebas unitarias para las clases auxiliares y modelos del proyecto:
- * - [Song] (Modelo principal)
- * - [Converters] (Convertidores de tipo para Room)
+ * - Song (Modelo principal)
+ * - Converters (Convertidores de tipo para Room)
  */
 class ExampleUnitTest {
 
-    // ────────────────────────────────────────────────────────────────────────
     // Pruebas para el Modelo Song
-    // ────────────────────────────────────────────────────────────────────────
 
     @Test
     fun song_getYouTubeUrl_isCorrect() {
@@ -72,9 +70,7 @@ class ExampleUnitTest {
         assertTrue(song.isLocal)
     }
 
-    // ────────────────────────────────────────────────────────────────────────
     // Pruebas para Converters de Base de Datos Room
-    // ────────────────────────────────────────────────────────────────────────
 
     private val converters = Converters()
 

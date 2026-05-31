@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Converters.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.example.arpegio.data.local</a> &gt; <span class="el_source">Converters.kt</span></div><h1>Converters.kt</h1><pre class="source lang-java linenums">package com.example.arpegio.data.local
+
+import androidx.room.TypeConverter
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import java.util.Date
+
+/**
+ * Convertidores de tipo para Room.
+ *
+ * Room solo soporta tipos primitivos, String y ByteArray de forma nativa.
+ * Esta clase proporciona serialización/deserialización mediante Gson para los
+ * tipos complejos usados en el modelo Song:
+ *
+ * - Map&lt;String, String&gt; → JSON (campo &quot;tabs&quot;)
+ * - List&lt;String&gt;` → JSON (campo tags&quot;)
+ * - Date → Long (campo &quot;createdAt&quot;)
+ *
+ * Registrado globalmente en AppDataBase
+ */
+<span class="fc" id="L21">class Converters {</span>
+<span class="fc" id="L22">    private val gson = Gson()</span>
+
+    // Map&lt;String, String&gt; (tabs: instrumento → ruta del archivo)
+
+    @TypeConverter
+    fun fromStringMap(value: Map&lt;String, String&gt;?): String {
+<span class="fc" id="L28">        return gson.toJson(value)</span>
+    }
+
+    @TypeConverter
+    fun toStringMap(value: String): Map&lt;String, String&gt; {
+<span class="fc" id="L33">        val mapType = object : TypeToken&lt;Map&lt;String, String&gt;&gt;() {}.type</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        return gson.fromJson(value, mapType) ?: emptyMap()</span>
+    }
+
+    // List&lt;String&gt; (tags: etiquetas de clasificación)
+
+    @TypeConverter
+    fun fromStringList(value: List&lt;String&gt;?): String {
+<span class="fc" id="L41">        return gson.toJson(value)</span>
+    }
+
+    @TypeConverter
+    fun toStringList(value: String): List&lt;String&gt; {
+<span class="fc" id="L46">        val listType = object : TypeToken&lt;List&lt;String&gt;&gt;() {}.type</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        return gson.fromJson(value, listType) ?: emptyList()</span>
+    }
+
+    // Date (createdAt: timestamp de creación)
+
+    @TypeConverter
+    fun fromTimestamp(value: Long?): Date? {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        return value?.let { Date(it) }</span>
+    }
+
+    @TypeConverter
+    fun dateToTimestamp(date: Date?): Long? {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        return date?.time</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

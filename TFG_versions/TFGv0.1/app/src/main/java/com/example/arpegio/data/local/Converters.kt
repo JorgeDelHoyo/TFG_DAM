@@ -21,7 +21,7 @@ import java.util.Date
 class Converters {
     private val gson = Gson()
 
-    // ── Map<String, String> (tabs: instrumento → ruta del archivo) ──
+    // Map<String, String> (tabs: instrumento → ruta del archivo)
 
     @TypeConverter
     fun fromStringMap(value: Map<String, String>?): String {
@@ -34,7 +34,7 @@ class Converters {
         return gson.fromJson(value, mapType) ?: emptyMap()
     }
 
-    // ── List<String> (tags: etiquetas de clasificación) ──
+    // List<String> (tags: etiquetas de clasificación)
 
     @TypeConverter
     fun fromStringList(value: List<String>?): String {
@@ -47,7 +47,7 @@ class Converters {
         return gson.fromJson(value, listType) ?: emptyList()
     }
 
-    // ── Date (createdAt: timestamp de creación) ──
+    // Date (createdAt: timestamp de creación)
 
     @TypeConverter
     fun fromTimestamp(value: Long?): Date? {

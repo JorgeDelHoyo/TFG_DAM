@@ -34,7 +34,7 @@ data class ExternalControls(
     val play: Boolean = false,
     val playbackSpeed: Float = 1.0f,
     val isMuted: Boolean = false, //  Estado de mute
-    val seekEvent: SeekEvent? = null // Evento único de seek con timestamp para evitar repeticiones
+    val seekEvent: SeekEvent? = null // Evento seek con timestamp para evitar repeticiones
 )
 
 @SuppressLint("SetJavaScriptEnabled")

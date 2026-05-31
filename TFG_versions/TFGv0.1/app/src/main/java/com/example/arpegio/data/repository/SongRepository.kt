@@ -50,7 +50,7 @@ class SongRepository @Inject constructor(
     /**
      * Obtiene las canciones de la comunidad desde Firestore en tiempo real.
      *
-     * Usa [callbackFlow] + addSnapshotListener para emitir actualizaciones reactivas.
+     * Usa callbackFlow + addSnapshotListener para emitir actualizaciones reactivas.
      * Las canciones se ordenan por fecha de creación descendente (más recientes primero).
      *
      * @return Flow que emite la lista actualizada cada vez que Firestore detecta cambios.
@@ -92,7 +92,7 @@ class SongRepository @Inject constructor(
     fun getLocalSongs(): Flow<List<Song>> = cancionDao.getLocalSongs()
 
     /**
-     * Importa un archivo .gp3 desde el sistema de archivos del dispositivo.
+     * Importa un archivo local desde el sistema de archivos del dispositivo.
      *
      * Proceso:
      * 1. Copia el archivo desde la URI seleccionada al almacenamiento interno (filesDir).
@@ -138,7 +138,7 @@ class SongRepository @Inject constructor(
     }
 
     /**
-     * Elimina una canción local: borra el archivo .gp3 del almacenamiento
+     * Elimina una canción local: borra el archivo local del almacenamiento
      * interno y elimina el registro de la base de datos Room.
      */
     suspend fun deleteLocalSong(song: Song): Unit = withContext(Dispatchers.IO) {

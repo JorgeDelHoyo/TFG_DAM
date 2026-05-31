@@ -25,8 +25,6 @@ import java.io.File
  * - **Remoto (esLocal=false):** Archivos desde /assets/ (empaquetados con la APK o descargados).
  * - **Local (esLocal=true):** Archivos desde filesDir (importados por el usuario).
  *
- * La comunicación Android ↔ JavaScript se realiza mediante [WebView.evaluateJavascript].
- *
  * @param urlArchivo Ruta del archivo de tablatura (nombre de asset o ruta absoluta).
  * @param instrumentIndex Índice del track/instrumento a renderizar en AlphaTab.
  * @param videoDuration Duración total de referencia en segundos (del vídeo YouTube o del score).
@@ -42,7 +40,7 @@ fun PartituraWebView(
     esLocal: Boolean = false,
     modifier: Modifier = Modifier,
     onWebViewCreated: (WebView) -> Unit = {},
-    onBeatClicked: (Float) -> Unit = {} // 👈 Callback para capturar clics en beats
+    onBeatClicked: (Float) -> Unit = {}
 ) {
     val safeInstrumentIndex = instrumentIndex.coerceAtLeast(0)
 
@@ -163,10 +161,6 @@ fun PartituraWebView(
         }
     )
 }
-
-// ============================================================
-// Funciones de extensión para control del cursor desde Kotlin
-// ============================================================
 
 /** Inicia el avance del cursor desde un segundo dado. */
 fun WebView.startAutoScroll(startTime: Float = 0f) {

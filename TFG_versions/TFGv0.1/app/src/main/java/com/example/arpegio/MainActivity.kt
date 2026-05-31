@@ -33,15 +33,12 @@ import kotlinx.coroutines.delay
 /**
  * Activity principal y único punto de entrada de la aplicación Arpeg.io.
  *
- * Implementa navegación manual basada en estado (sin Navigation Component) con
+ * Implementa navegación manual basada en estado con
  * cuatro pantallas posibles:
- * - **"splash"**: Pantalla de bienvenida con el logo animado de Arpeg.io.
- * - **"library"**: Pantalla de biblioteca con canciones remotas y locales.
- * - **"player"**: Reproductor con YouTube + partitura sincronizada (canciones de Firestore).
- * - **"local_player"**: Reproductor con metrónomo virtual + partitura local (archivos .gp3).
- *
- * Anotada con @AndroidEntryPoint para habilitar la inyección de dependencias de Hilt
- * en los ViewModels de cada pantalla.
+ * - "splash": Pantalla de bienvenida con el logo animado de Arpeg.io.
+ * - "library": Pantalla de biblioteca con canciones remotas y locales.
+ * - "player": Reproductor con YouTube + partitura sincronizada (canciones de Firestore).
+ * - *"local_player": Reproductor con metrónomo virtual + partitura local (archivos locales).
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -95,7 +92,7 @@ class MainActivity : ComponentActivity() {
 }
 
 /**
- * 🎸 Pantalla de Splash — Logo Arpeg.io animado.
+ * Pantalla de Splash — Logo Arpeg.io animado.
  *
  * Muestra el logo con una animación de escala + fade in,
  * y navega automáticamente a la biblioteca tras 2 segundos.
@@ -134,7 +131,7 @@ private fun SplashScreen(onSplashFinished: () -> Unit) {
                 .scale(scale)
                 .alpha(alpha)
         ) {
-            // Logo (usa el drawable del adaptive icon)
+            // Logo
             Image(
                 painter = painterResource(id = R.drawable.ic_launcher_foreground),
                 contentDescription = "Logo Arpeg.io",

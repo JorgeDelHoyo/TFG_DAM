@@ -9,7 +9,6 @@ import dagger.hilt.android.HiltAndroidApp
 /**
  * Clase Application de Arpeg.io.
  *
- * Anotada con @HiltAndroidApp para inicializar el contenedor de dependencias de Hilt.
  * También configura Firestore con persistencia offline habilitada para que la
  * biblioteca de canciones funcione sin conexión a Internet.
  */
@@ -18,7 +17,7 @@ class ArpegioApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Habilitar caché offline de Firestore para funcionar sin conexión
+        // Habilita caché offline de Firestore para funcionar sin conexión
         val firestore = FirebaseFirestore.getInstance()
         val settings = FirebaseFirestoreSettings.Builder()
             .setPersistenceEnabled(true)

@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/tfgv01/ui/viewmodel/LocalPlayerViewModel.kt
 package com.example.arpegio.ui.viewmodel
 
 import android.util.Log
@@ -11,7 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
 /**
- * Estado UI de la pantalla del reproductor local (canciones .gp3 importadas por el usuario).
+ * Estado UI de la pantalla del reproductor local (canciones locales importadas por el usuario).
  *
  * @property isPlaying Indica si el metrónomo virtual está avanzando.
  * @property currentTempoMultiplier Multiplicador de velocidad (1.0 = 100% original, 0.5 = mitad, 2.0 = doble).
@@ -33,7 +32,7 @@ data class LocalPlayerUiState(
 /**
  * ViewModel para el reproductor de canciones locales (archivos .gp3 importados).
  *
- * A diferencia del [PlayerViewModel] (que se sincroniza con YouTube), este ViewModel
+ * A diferencia del PlayerViewModel (que se sincroniza con YouTube), este ViewModel
  * genera su propio reloj interno (metrónomo) que avanza el cursor de la partitura.
  * El usuario puede ajustar la velocidad con el slider de tempo.
  */

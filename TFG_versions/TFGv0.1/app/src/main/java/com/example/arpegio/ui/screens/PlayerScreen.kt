@@ -55,7 +55,7 @@ fun PlayerScreen(
     }
     val partituraWebViewRef = remember { mutableStateOf<WebView?>(null) }
     var videoDuration by remember { mutableStateOf(180f) }
-    var seekEvent by remember { mutableStateOf<SeekEvent?>(null) } // 👈 Estado de Compose para eventos de seek
+    var seekEvent by remember { mutableStateOf<SeekEvent?>(null) } // Estado de Compose para eventos de seek
 
     // --- ⚡ MÓDULO DE FLUIDEZ ---
     var lastYoutubeTime by remember { mutableStateOf(0f) }
@@ -101,7 +101,7 @@ fun PlayerScreen(
             }
         }
 
-        // 🔹 2. ÁREA DE PARTITURA (Ocupa todo el centro)
+        // 2. ÁREA DE PARTITURA
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -120,12 +120,12 @@ fun PlayerScreen(
                             partituraWebViewRef.value = webView
                             if (isPlaying) webView.startAutoScroll(currentTime + syncOffset)
                         },
+                        // El usuario hace click en un compás/nota
                         onBeatClicked = { seconds ->
-                            // 🚀 Cuando el usuario hace click en un compás/nota:
                             val targetEvent = SeekEvent(seconds)
                             seekEvent = targetEvent
                             viewModel.seekTo(seconds)
-                            // Corregimos la partitura de inmediato en local para máxima reactividad visual
+                            // Se corrige la posición del cursor al momento
                             partituraWebViewRef.value?.correctAutoScrollTime(seconds + syncOffset)
                         }
                     )
@@ -133,7 +133,7 @@ fun PlayerScreen(
             }
         }
 
-        // 🔹 3. BOTTOM BAR DESPLEGABLE Y RESPONSIVA
+        // 3. BOTTOM BAR DESPLEGABLE Y RESPONSIVE
         Surface(
             color = MaterialTheme.colorScheme.inverseSurface,
             modifier = Modifier
@@ -150,7 +150,7 @@ fun PlayerScreen(
                     .padding(top = 4.dp, bottom = if (isLandscape) 4.dp else 8.dp)
             ) {
 
-                // Tirador (Siempre visible)
+                // Menú
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -213,7 +213,7 @@ fun PlayerScreen(
                             )
                         }
 
-                        // Timer + Play/Pause
+                        // Timer y Play/Pause
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "⏱️ ${String.format("%.1f", currentTime)}s",
@@ -239,7 +239,7 @@ fun PlayerScreen(
                             }
                         }
 
-                        // Offset Sync Controls (Sincronización manual)
+                        // Offset Sync Controls (Sincronización manual +0.5s o -0.5s)
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("Sincronizar", style = MaterialTheme.typography.labelSmall, color = barTextColor.copy(alpha = 0.8f))
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -274,15 +274,15 @@ fun PlayerScreen(
             }
         }
 
-        // 🔹 4. YOUTUBE PLAYER — Siempre vivo, INVISIBLE (1dp)
+        // 4. YOUTUBE PLAYER
         // Solo existe para proveer audio y time updates desde YouTube.
-        // No necesita ser visible: la partitura + cursor son la interfaz principal.
+        // No necesita ser visible (la partitura + cursor son la interfaz principal).
         Box(modifier = Modifier.size(1.dp)) {
             YouTubePlayerSection(
                 videoId = song.youtubeVideoId,
                 isPlaying = isPlaying,
                 isMuted = isMuted,
-                seekEvent = seekEvent, // 👈 Pasamos el evento de seek aquí
+                seekEvent = seekEvent,
                 onTimeUpdate = { seconds ->
                     viewModel.updateCurrentTime(seconds)
                     partituraWebViewRef.value?.correctAutoScrollTime(seconds + syncOffset)
@@ -323,7 +323,7 @@ private fun YouTubePlayerSection(
     videoId: String,
     isPlaying: Boolean,
     isMuted: Boolean,
-    seekEvent: SeekEvent? = null, // 👈 Recibimos el evento de seek
+    seekEvent: SeekEvent? = null,
     onTimeUpdate: (Float) -> Unit,
     onDurationUpdate: (Float) -> Unit,
     modifier: Modifier = Modifier
@@ -341,7 +341,7 @@ private fun YouTubePlayerSection(
                 play = isPlaying,
                 playbackSpeed = 1.0f,
                 isMuted = isMuted,
-                seekEvent = seekEvent // 👈 Y se lo propagamos a YouTubePlayer
+                seekEvent = seekEvent
             ),
             modifier = Modifier.fillMaxSize()
         )

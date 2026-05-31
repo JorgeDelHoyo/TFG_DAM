@@ -40,8 +40,8 @@ sealed interface LibraryUiState {
 }
 
 /**
- * Eventos puntuales de la UI (one-shot events) que no deben persistir en el estado.
- * Se envían por [Channel] para garantizar que cada evento se consume exactamente una vez.
+ * Eventos puntuales de la interfaz que no deben persistir en el estado.
+ * Se garantiza que cada evento se consume exactamente una vez.
  */
 sealed interface LibraryUiEvent {
     data class ShowToast(val message: String) : LibraryUiEvent
@@ -52,9 +52,9 @@ sealed interface LibraryUiEvent {
  * ViewModel de la pantalla de biblioteca.
  *
  * Combina reactivamente los flujos de Firestore (canciones remotas) y Room (canciones locales)
- * usando [combine] para mantener la UI sincronizada con ambas fuentes de datos.
+ * para mantener la interfaz sincronizada con ambas fuentes de datos.
  *
- * @property repository Repositorio de canciones inyectado por Hilt.
+ * @property repository Repositorio de canciones
  */
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
@@ -73,7 +73,7 @@ class LibraryViewModel @Inject constructor(
 
     /**
      * Combina los flujos de Firestore y Room para tener una vista unificada.
-     * Usa [combine] para re-emitir cada vez que cualquiera de las dos fuentes cambia.
+     * y se re-emite cada vez que cualquiera de las dos fuentes cambia.
      */
     private fun loadAllSongsCombined() {
         viewModelScope.launch {
@@ -130,8 +130,8 @@ class LibraryViewModel @Inject constructor(
     }
 
     /**
-     * Importa un archivo .gp3 seleccionado por el usuario.
-     * Delega en [SongRepository.saveLocalSong] que copia el archivo y lo registra en Room.
+     * Importa un archivo local seleccionado por el usuario.
+     *  Copie el archivo y lo registra en Room.
      */
     fun addCustomSong(title: String, fileUri: Uri?) {
         if (title.isBlank() || fileUri == null) {

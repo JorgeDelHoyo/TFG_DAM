@@ -11,10 +11,10 @@ import com.example.arpegio.data.model.Song
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Data Access Object para operaciones CRUD sobre la tabla `canciones_locales` en Room.
+ * Data Access Object para operaciones CRUD sobre la tabla "canciones_locales" en Room.
  *
- * Todas las operaciones de escritura son `suspend` (se ejecutan en una corrutina con Dispatchers.IO).
- * La consulta de lectura devuelve un [Flow] reactivo que se actualiza automáticamente.
+ * Todas las operaciones de escritura son "suspend" (se ejecutan en una corrutina con Dispatchers.IO).
+ * La consulta de lectura devuelve un Flow reactivo que se actualiza automáticamente.
  */
 @Dao
 interface CancionDao {

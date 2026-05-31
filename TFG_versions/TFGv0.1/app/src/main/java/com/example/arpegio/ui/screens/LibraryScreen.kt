@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/arpegio/ui/screens/LibraryScreen.kt
 package com.example.arpegio.ui.screens
 
 import android.net.Uri
@@ -430,14 +429,6 @@ private fun SearchField(
     )
 }
 
-/**
- * Tarjeta visual premium para cada canción de la comunidad.
- *
- * Muestra: icono circular con nota musical, título en negrita,
- * artista en color primario, chip de dificultad con código de color
- * (verde/naranja/rojo), lista de instrumentos disponibles, y flecha
- * de navegación indicando interactividad.
- */
 @Composable
 private fun SongItem(song: Song, onClick: () -> Unit) {
     Card(
@@ -455,7 +446,7 @@ private fun SongItem(song: Song, onClick: () -> Unit) {
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ── Icono circular con nota musical ──
+            // Icono circular con nota musical
             Box(
                 modifier = Modifier
                     .size(48.dp)
@@ -473,7 +464,7 @@ private fun SongItem(song: Song, onClick: () -> Unit) {
 
             Spacer(modifier = Modifier.width(14.dp))
 
-            // ── Contenido central: título, artista, dificultad + instrumentos ──
+            // Contenido central: título, artista, dificultad + instrumentos
             Column(
                 modifier = Modifier.weight(1f)
             ) {
@@ -489,7 +480,7 @@ private fun SongItem(song: Song, onClick: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(2.dp))
 
-                // Artista — prominente con color primario
+                // Artista
                 Text(
                     text = song.artist,
                     style = MaterialTheme.typography.bodyMedium,
@@ -501,12 +492,11 @@ private fun SongItem(song: Song, onClick: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Fila de metadatos: dificultad + instrumentos
+                // Dificultad + instrumentos
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Chip de dificultad con color codificado
                     if (song.difficulty.isNotBlank()) {
                         DifficultyBadge(difficulty = song.difficulty)
                     }
@@ -530,7 +520,7 @@ private fun SongItem(song: Song, onClick: () -> Unit) {
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            // ── Flecha de navegación ──
+            // Flecha de navegación
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = "Abrir canción",
@@ -541,12 +531,7 @@ private fun SongItem(song: Song, onClick: () -> Unit) {
     }
 }
 
-/**
- * Badge compacto de dificultad con código de color:
- * - Verde (beginner) — para principiantes
- * - Naranja (intermediate) — nivel medio
- * - Rojo (advanced) — nivel avanzado
- */
+// Metodo para elegir color según la dificultad
 @Composable
 private fun DifficultyBadge(difficulty: String) {
     val (label, color) = when (difficulty.lowercase()) {
@@ -596,7 +581,7 @@ private fun ErrorView(message: String, onRetry: () -> Unit, modifier: Modifier =
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("❌ $message", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.error)
+        Text("$message", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.error)
         Button(onClick = onRetry, modifier = Modifier.padding(top = 16.dp)) {
             Text("Reintentar")
         }

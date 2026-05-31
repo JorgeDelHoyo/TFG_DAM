@@ -7,11 +7,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
- * 📝 Tipografía personalizada para Arpegio
+ * Tipografía personalizada para Arpegio
  * Usa la familia de fuentes por defecto del sistema
  */
 val Typography = Typography(
-    // 🎯 Display (títulos grandes)
+    // Display (títulos grandes)
     displayLarge = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Bold,
@@ -34,7 +34,7 @@ val Typography = Typography(
         letterSpacing = 0.sp
     ),
 
-    // 📌 Headline (encabezados de sección)
+    // Headline (encabezados de sección)
     headlineLarge = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.SemiBold,
@@ -80,7 +80,7 @@ val Typography = Typography(
         letterSpacing = 0.1.sp
     ),
 
-    // 📝 Body (contenido principal)
+    // Body (contenido principal)
     bodyLarge = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
@@ -103,7 +103,7 @@ val Typography = Typography(
         letterSpacing = 0.4.sp
     ),
 
-    // 🔘 Label (botones, chips, tabs)
+    // Label (botones, chips, tabs)
     labelLarge = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Medium,

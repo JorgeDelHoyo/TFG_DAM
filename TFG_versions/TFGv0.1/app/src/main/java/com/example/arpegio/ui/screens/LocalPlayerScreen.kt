@@ -1,4 +1,3 @@
-// app/src/main/java/com/example/tfgv01/ui/screens/LocalPlayerScreen.kt
 package com.example.arpegio.ui.screens
 
 import android.content.res.Configuration
@@ -83,7 +82,7 @@ fun LocalPlayerScreen(
             .windowInsetsPadding(WindowInsets.navigationBars)
             .statusBarsPadding()
     ) {
-        // 🔹 1. CABECERA Y SELECTOR
+        // 1. CABECERA Y SELECTOR
         AnimatedVisibility(
             visible = !isBottomBarExpanded,
             enter = expandVertically() + fadeIn(),
@@ -99,7 +98,7 @@ fun LocalPlayerScreen(
             }
         }
 
-        // 🔹 2. ÁREA DE PARTITURA
+        // 2. ÁREA DE PARTITURA
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -146,7 +145,7 @@ fun LocalPlayerScreen(
             }
         }
 
-        // 🔹 3. BOTTOM BAR DESPLEGABLE
+        // 3. BOTTOM BAR DESPLEGABLE
         Surface(
             color = MaterialTheme.colorScheme.inverseSurface,
             modifier = Modifier
@@ -163,7 +162,7 @@ fun LocalPlayerScreen(
                     .padding(top = 4.dp, bottom = if (isLandscape) 4.dp else 8.dp)
             ) {
 
-                // Tirador de la barra
+                // Menú
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -209,7 +208,7 @@ fun LocalPlayerScreen(
                             Icon(Icons.Default.Speed, contentDescription = null, tint = barTextColor)
                             Spacer(modifier = Modifier.width(8.dp))
 
-                            // 🚀 Muestra el tempo en BPM
+                            // Muestra el tempo en BPM
                             Text(
                                 text = "Tempo: $bpmActuales BPM",
                                 style = MaterialTheme.typography.labelMedium,

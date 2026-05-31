@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="es"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Cancion.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">com.example.arpegio.data.model</a> &gt; <span class="el_source">Cancion.kt</span></div><h1>Cancion.kt</h1><pre class="source lang-java linenums">// app/src/main/java/com/example/tfgv01/data/model/Song.kt
+package com.example.arpegio.data.model
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+import com.google.firebase.firestore.DocumentId
+import com.google.firebase.firestore.ServerTimestamp
+import java.util.Date
+
+/**
+ * Modelo de datos principal que representa una canción en la aplicación.
+ *
+ * Esta clase actúa como entidad de Room para la persistencia local Y como
+ * modelo de deserialización de Firestore para las canciones remotas de la comunidad.
+ *
+ * @property id Identificador único. Para canciones remotas viene de Firestore (@DocumentId),
+ *              para locales se genera con UUID.
+ * @property title Título de la canción (ej: &quot;Killer Queen&quot;).
+ * @property artist Nombre del artista (ej: &quot;Queen&quot;). Para locales se fija como &quot;Mis Canciones&quot;.
+ * @property youtubeVideoId ID del vídeo de YouTube para la reproducción sincronizada.
+ *                          Vacío para canciones locales que no tienen vídeo asociado.
+ * @property tabs Mapa de instrumento → ruta de archivo .gp.
+ *               Para canciones remotas: nombre del archivo en /assets/ (ej: &quot;queen-killer_queen.gp&quot;).
+ *               Para canciones locales: ruta absoluta en filesDir (ej: &quot;/data/.../user_tab_12345.gp&quot;).
+ * @property difficulty Nivel de dificultad de la pieza: &quot;beginner&quot;, &quot;intermediate&quot; o &quot;advanced&quot;.
+ * @property tags Etiquetas de clasificación (ej: [&quot;rock&quot;, &quot;clásico&quot;]).
+ * @property createdAt Timestamp de creación. Generado automáticamente por Firestore en canciones remotas.
+ * @property isLocal Flag que determina el flujo de reproducción: true = LocalPlayerScreen, false = PlayerScreen.
+ */
+<span class="fc" id="L30">@Entity(tableName = &quot;canciones_locales&quot;)</span>
+<span class="fc" id="L31">data class Song(</span>
+<span class="fc" id="L32">    @PrimaryKey</span>
+<span class="fc" id="L33">    @DocumentId val id: String = &quot;&quot;,</span>
+
+<span class="fc" id="L35">    val title: String = &quot;&quot;,</span>
+<span class="fc" id="L36">    val artist: String = &quot;&quot;,</span>
+<span class="fc" id="L37">    val youtubeVideoId: String = &quot;&quot;,</span>
+
+<span class="fc" id="L39">    val tabs: Map&lt;String, String&gt; = emptyMap(),</span>
+
+<span class="fc" id="L41">    val difficulty: String = &quot;intermediate&quot;,</span>
+<span class="fc" id="L42">    val tags: List&lt;String&gt; = emptyList(),</span>
+
+<span class="fc" id="L44">    @ServerTimestamp val createdAt: Date? = null,</span>
+
+<span class="fc" id="L46">    val isLocal: Boolean = false</span>
+) {
+    // Constructor vacío requerido por Firestore para deserialización automática
+<span class="fc" id="L49">    constructor() : this(</span>
+<span class="fc" id="L50">        id = &quot;&quot;,</span>
+<span class="fc" id="L51">        title = &quot;&quot;,</span>
+<span class="fc" id="L52">        artist = &quot;&quot;,</span>
+<span class="fc" id="L53">        youtubeVideoId = &quot;&quot;,</span>
+<span class="fc" id="L54">        tabs = emptyMap(),</span>
+<span class="fc" id="L55">        difficulty = &quot;intermediate&quot;,</span>
+<span class="fc" id="L56">        tags = emptyList(),</span>
+<span class="fc" id="L57">        createdAt = null,</span>
+<span class="fc" id="L58">        isLocal = false</span>
+<span class="fc" id="L59">    )</span>
+
+    /** Genera la URL completa de YouTube a partir del videoId. */
+<span class="fc" id="L62">    fun getYouTubeUrl(): String = &quot;https://www.youtube.com/watch?v=$youtubeVideoId&quot;</span>
+
+    /** Verifica si la canción tiene tablatura disponible para un instrumento dado. */
+<span class="fc" id="L65">    fun hasTabFor(instrument: String): Boolean = tabs.containsKey(instrument)</span>
+<span class="fc" id="L66">}</span>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>

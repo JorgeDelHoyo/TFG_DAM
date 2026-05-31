@@ -53,11 +53,9 @@ class LibraryViewModelTest {
         remoteSongsFlow = MutableStateFlow(emptyList())
         localSongsFlow = MutableStateFlow(emptyList())
 
-        // Stubbing the initialization flows
         whenever(repository.getSongs()).thenReturn(remoteSongsFlow)
         whenever(repository.getLocalSongs()).thenReturn(localSongsFlow)
 
-        // Initialize viewModel
         viewModel = LibraryViewModel(repository)
     }
 

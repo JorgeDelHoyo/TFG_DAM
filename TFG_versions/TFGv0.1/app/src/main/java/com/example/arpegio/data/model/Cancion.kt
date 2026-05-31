@@ -19,9 +19,9 @@ import java.util.Date
  * @property artist Nombre del artista (ej: "Queen"). Para locales se fija como "Mis Canciones".
  * @property youtubeVideoId ID del vídeo de YouTube para la reproducción sincronizada.
  *                          Vacío para canciones locales que no tienen vídeo asociado.
- * @property tabs Mapa de instrumento → ruta de archivo .gp3.
- *               Para canciones remotas: nombre del archivo en /assets/ (ej: "queen-killer_queen.gp3").
- *               Para canciones locales: ruta absoluta en filesDir (ej: "/data/.../user_tab_12345.gp3").
+ * @property tabs Mapa de instrumento → ruta de archivo .gp.
+ *               Para canciones remotas: nombre del archivo en /assets/ (ej: "queen-killer_queen.gp").
+ *               Para canciones locales: ruta absoluta en filesDir (ej: "/data/.../user_tab_12345.gp").
  * @property difficulty Nivel de dificultad de la pieza: "beginner", "intermediate" o "advanced".
  * @property tags Etiquetas de clasificación (ej: ["rock", "clásico"]).
  * @property createdAt Timestamp de creación. Generado automáticamente por Firestore en canciones remotas.
