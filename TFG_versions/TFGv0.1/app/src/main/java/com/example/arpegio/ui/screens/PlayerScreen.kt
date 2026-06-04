@@ -57,7 +57,7 @@ fun PlayerScreen(
     var videoDuration by remember { mutableStateOf(180f) }
     var seekEvent by remember { mutableStateOf<SeekEvent?>(null) } // Estado de Compose para eventos de seek
 
-    // --- ⚡ MÓDULO DE FLUIDEZ ---
+    // --- MÓDULO DE FLUIDEZ ---
     var lastYoutubeTime by remember { mutableStateOf(0f) }
     var systemTimeAtLastUpdate by remember { mutableStateOf(0L) }
     LaunchedEffect(currentTime) {
@@ -85,7 +85,7 @@ fun PlayerScreen(
             .windowInsetsPadding(WindowInsets.navigationBars)
             .statusBarsPadding()
     ) {
-        // 🔹 1. CABECERA Y SELECTOR (Se ocultan al expandir la barra inferior)
+        // 1. CABECERA Y SELECTOR (Se ocultan al expandir la barra inferior)
         AnimatedVisibility(
             visible = !isBottomBarExpanded,
             enter = expandVertically() + fadeIn(),
